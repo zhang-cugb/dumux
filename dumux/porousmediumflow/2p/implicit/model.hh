@@ -146,9 +146,7 @@ public:
 
                 (*rank)[eIdx] = this->gridView_().comm().rank();
 
-                FVElementGeometry fvGeometry;
-                fvGeometry.update(this->gridView_(), element);
-
+                const auto& fvGeometry = this->fvGeometries(eIdx);
                 ElementVolumeVariables elemVolVars;
                 elemVolVars.update(this->problem_(),
                                    element,
