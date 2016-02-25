@@ -76,7 +76,8 @@ public:
      *                types should be collected
      */
     void update(const Problem &problem,
-                const Element &element)
+                const Element &element,
+                const FVElementGeometry &fvGeometry)
     {
         this->resize(1);
 
@@ -86,25 +87,29 @@ public:
 
         (*this)[0].reset();
 
-        if (!problem.model().onBoundary(element))
-            return;
+        for (auto&& scv : fvGeometry.scvs())
+        {
+            if (!problem.model().onBoundary(scv))
+                return;
 
-        for (const auto& intersection : intersections(problem.gridView(), element)) {
-            if (!intersection.boundary())
-                continue;
+            for (const auto&& scvFace : fvGeometry.scvfs())
+            {
+                if (!scvFace.boundary())
+                    continue;
 
-            problem.boundaryTypes((*this)[0], intersection);
+                (*this)[0] = problem.boundaryTypes(element, scvFace);
 
-            hasDirichlet_ = hasDirichlet_ || (*this)[0].hasDirichlet();
-            hasNeumann_ = hasNeumann_ || (*this)[0].hasNeumann();
-            hasOutflow_ = hasOutflow_ || (*this)[0].hasOutflow();
+                hasDirichlet_ = hasDirichlet_ || (*this)[0].hasDirichlet();
+                hasNeumann_ = hasNeumann_ || (*this)[0].hasNeumann();
+                hasOutflow_ = hasOutflow_ || (*this)[0].hasOutflow();
+            }
         }
     }
 
     void update(const Problem &problem,
-                const Element &element,
-                const FVElementGeometry &fvGeometry)
+                const Element &element)
     {
+        const auto& fvGeometry = problem.model().fvGeometries(element);
         update(problem, element);
     }
 
