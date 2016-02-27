@@ -79,23 +79,23 @@ public:
                             MultiWriter &writer)
     {
         typedef Dune::BlockVector<Dune::FieldVector<double, 1> > ScalarField;
-        typedef Dune::BlockVector<Dune::FieldVector<double, dimWorld> > VectorField;
+        // typedef Dune::BlockVector<Dune::FieldVector<double, dimWorld> > VectorField;
 
         // create the required scalar fields
         unsigned numDofs = this->numDofs();
         ScalarField *p = writer.allocateManagedBuffer(numDofs);
         ScalarField *K = writer.allocateManagedBuffer(numDofs);
-        VectorField *velocity = writer.template allocateManagedBuffer<double, dimWorld>(numDofs);
-        ImplicitVelocityOutput<TypeTag> velocityOutput(this->problem_());
+        // VectorField *velocity = writer.template allocateManagedBuffer<double, dimWorld>(numDofs);
+        // ImplicitVelocityOutput<TypeTag> velocityOutput(this->problem_());
 
-        if (velocityOutput.enableOutput())
-        {
-            // initialize velocity field
-            for (unsigned int i = 0; i < numDofs; ++i)
-            {
-                (*velocity)[i] = double(0);
-            }
-        }
+        // if (velocityOutput.enableOutput())
+        // {
+        //     // initialize velocity field
+        //     for (unsigned int i = 0; i < numDofs; ++i)
+        //     {
+        //         (*velocity)[i] = double(0);
+        //     }
+        // }
 
         unsigned numElements = this->gridView_().size(0);
         ScalarField *rank = writer.allocateManagedBuffer(numElements);
@@ -104,41 +104,29 @@ public:
         {
             if(element.partitionType() == Dune::InteriorEntity)
             {
-                int eIdx = this->problem_().model().elementMapper().index(element);
+                int eIdx = this->elementMapper().index(element);
                 (*rank)[eIdx] = this->gridView_().comm().rank();
 
-                FVElementGeometry fvGeometry;
-                fvGeometry.update(this->gridView_(), element);
-
-                ElementVolumeVariables elemVolVars;
-                elemVolVars.update(this->problem_(),
-                                   element,
-                                   fvGeometry,
-                                   false /* oldSol? */);
-
-                for (int scvIdx = 0; scvIdx < fvGeometry.numScv; ++scvIdx)
+                for (auto&& scv : this->fvGeometries(element).scvs())
                 {
-                    int dofIdxGlobal = this->dofMapper().subIndex(element, scvIdx, dofCodim);
+                    const auto& spatialParams = this->problem_().spatialParams();
+                    auto dofIdxGlobal = scv.dofIndex();
 
-                    const SpatialParams &spatialParams = this->problem_().spatialParams();
-
-                    (*p)[dofIdxGlobal] = elemVolVars[scvIdx].pressure();
-                    (*K)[dofIdxGlobal] = spatialParams.intrinsicPermeability(element,
-                                                                         fvGeometry,
-                                                                         scvIdx);
+                    (*p)[dofIdxGlobal] = this->curVolVars(scv).pressure();
+                    (*K)[dofIdxGlobal] = spatialParams.intrinsicPermeability(scv);
                 }
 
                 // velocity output
-                velocityOutput.calculateVelocity(*velocity, elemVolVars, fvGeometry, element, /*phaseIdx=*/0);
+                //velocityOutput.calculateVelocity(*velocity, elemVolVars, fvGeometry, element, /*phaseIdx=*/0);
             }
         }
 
         writer.attachDofData(*p, "p", isBox);
         writer.attachDofData(*K, "K", isBox);
-        if (velocityOutput.enableOutput())
-        {
-            writer.attachDofData(*velocity,  "velocity", isBox, dim);
-        }
+        // if (velocityOutput.enableOutput())
+        // {
+        //     writer.attachDofData(*velocity,  "velocity", isBox, dim);
+        // }
         writer.attachCellData(*rank, "process rank");
     }
 };

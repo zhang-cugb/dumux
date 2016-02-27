@@ -43,8 +43,10 @@ class OnePTestSpatialParams : public ImplicitSpatialParamsOneP<TypeTag>
     typedef ImplicitSpatialParamsOneP<TypeTag> ParentType;
 
     typedef typename GET_PROP_TYPE(TypeTag, Scalar) Scalar;
+    typedef typename GET_PROP_TYPE(TypeTag, Problem) Problem;
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
     typedef typename GET_PROP_TYPE(TypeTag, FVElementGeometry) FVElementGeometry;
+    typedef typename GET_PROP_TYPE(TypeTag, SubControlVolume) SubControlVolume;
 
     enum {
         dim=GridView::dimension,
@@ -55,9 +57,11 @@ class OnePTestSpatialParams : public ImplicitSpatialParamsOneP<TypeTag>
     typedef typename GridView::template Codim<0>::Entity Element;
 
 public:
-    OnePTestSpatialParams(const GridView& gridView)
-        : ParentType(gridView)
+    OnePTestSpatialParams(const Problem& problem, const GridView& gridView)
+        : ParentType(problem, gridView)
     {
+        eps_ = 1.5e-7;
+
             lensLowerLeft_[0] = GET_RUNTIME_PARAM(TypeTag, Scalar, SpatialParams.LensLowerLeftX);
             if (dimWorld > 1)
                 lensLowerLeft_[1] = GET_RUNTIME_PARAM(TypeTag, Scalar, SpatialParams.LensLowerLeftY);
@@ -82,13 +86,9 @@ public:
      * \param scvIdx The index sub-control volume face where the
      *                      intrinsic velocity ought to be calculated.
      */
-    Scalar intrinsicPermeability(const Element &element,
-                                 const FVElementGeometry &fvGeometry,
-                                 const int scvIdx) const
+    Scalar intrinsicPermeability(const SubControlVolume &scv) const
     {
-        const GlobalPosition &globalPos = fvGeometry.subContVol[scvIdx].global;
-
-        if (isInLens_(globalPos))
+        if (isInLens_(scv.dofPosition()))
             return permeabilityLens_;
         else
             return permeability_;
@@ -100,16 +100,14 @@ public:
    * \param fvGeometry The finite volume geometry
    * \param scvIdx The local index of the sub-control volume where
    */
-    Scalar porosity(const Element &element,
-                    const FVElementGeometry &fvGeometry,
-                    const int scvIdx) const
+    Scalar porosity(const SubControlVolume &scv) const
     { return 0.4; }
 
 private:
     bool isInLens_(const GlobalPosition &globalPos) const
     {
         for (int i = 0; i < dimWorld; ++i) {
-            if (globalPos[i] < lensLowerLeft_[i] || globalPos[i] > lensUpperRight_[i])
+            if (globalPos[i] < lensLowerLeft_[i] + eps_ || globalPos[i] > lensUpperRight_[i] - eps_)
                 return false;
         }
         return true;
@@ -119,7 +117,9 @@ private:
     GlobalPosition lensUpperRight_;
 
     Scalar permeability_, permeabilityLens_;
+    Scalar eps_;
 };
-} // end namespace
-#endif
 
+} // end namespace
+
+#endif
