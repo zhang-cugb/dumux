@@ -43,7 +43,7 @@ namespace Properties
 {
 NEW_TYPE_TAG(InfiltrationProblem, INHERITS_FROM(ThreePThreeC, InfiltrationSpatialParams));
 NEW_TYPE_TAG(InfiltrationBoxProblem, INHERITS_FROM(BoxModel, InfiltrationProblem));
-NEW_TYPE_TAG(InfiltrationCCProblem, INHERITS_FROM(CCModel, InfiltrationProblem));
+NEW_TYPE_TAG(InfiltrationCCProblem, INHERITS_FROM(CCTpfaModel, InfiltrationProblem));
 
 // Set the grid type
 SET_TYPE_PROP(InfiltrationProblem, Grid, Dune::YaspGrid<2>);
@@ -103,6 +103,7 @@ class InfiltrationProblem : public ImplicitPorousMediaProblem<TypeTag>
 
     typedef typename GET_PROP_TYPE(TypeTag, Scalar) Scalar;
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+    typedef typename GET_PROP_TYPE(TypeTag, SubControlVolume) SubControlVolume;
 
     typedef typename GET_PROP_TYPE(TypeTag, MaterialLaw) MaterialLaw;
     typedef typename GET_PROP_TYPE(TypeTag, MaterialLawParams) MaterialLawParams;
@@ -151,8 +152,7 @@ public:
      * \param gridView The grid view
      */
     InfiltrationProblem(TimeManager &timeManager, const GridView &gridView)
-        : ParentType(timeManager, gridView)
-        , eps_(1e-6)
+        : ParentType(timeManager, gridView), eps_(1e-6)
     {
         temperature_ = 273.15 + 10.0; // -> 10 degrees Celsius
         FluidSystem::init(/*tempMin=*/temperature_ - 1,
@@ -162,7 +162,7 @@ public:
                           /*pressMax=*/3*1e5,
                           /*nPress=*/200);
 
-        name_               = GET_RUNTIME_PARAM(TypeTag, std::string, Problem.Name);
+        name_ = GET_RUNTIME_PARAM(TypeTag, std::string, Problem.Name);
     }
 
     /*!
@@ -196,10 +196,9 @@ public:
      * \param values The source values for the primary variables
      * \param globalPos The position
      */
-    void sourceAtPos(PrimaryVariables &values,
-                     const GlobalPosition &globalPos) const
+    PrimaryVariables sourceAtPos(const GlobalPosition &globalPos) const
     {
-        values = 0;
+        return PrimaryVariables(0.0);
     }
 
     // \}
@@ -216,15 +215,16 @@ public:
      * \param values The boundary types for the conservation equations
      * \param globalPos The position for which the bc type should be evaluated
      */
-    void boundaryTypesAtPos(BoundaryTypes &values,
-                            const GlobalPosition &globalPos) const
+    BoundaryTypes boundaryTypesAtPos(const GlobalPosition &globalPos) const
     {
+        BoundaryTypes values;
         if(globalPos[0] > 500. - eps_)
             values.setAllDirichlet();
         else if(globalPos[0] < eps_)
             values.setAllDirichlet();
         else
             values.setAllNeumann();
+        return values;
     }
 
     /*!
@@ -236,8 +236,10 @@ public:
      *
      * For this method, the \a values parameter stores primary variables.
      */
-    void dirichletAtPos(PrimaryVariables &values, const GlobalPosition &globalPos) const
+    PrimaryVariables dirichletAtPos(const GlobalPosition &globalPos) const
     {
+        PrimaryVariables values;
+
         Scalar y = globalPos[1];
         Scalar x = globalPos[0];
         Scalar sw, swr=0.12, sgr=0.03;
@@ -247,8 +249,7 @@ public:
             Scalar pc = 9.81 * 1000.0 * (y - (-5E-4*x+5));
             if (pc < 0.0) pc = 0.0;
 
-            sw = invertPcgw_(pc,
-                             this->spatialParams().materialLawParams());
+            sw = invertPcgw_(pc, this->spatialParams().materialLawParamsAtPos(globalPos));
             if (sw < swr) sw = swr;
             if (sw > 1.-sgr) sw = 1.-sgr;
 
@@ -260,6 +261,8 @@ public:
             values[switch1Idx] = 1.-sgr;
             values[switch2Idx] = 1.e-6;
         }
+
+        return values;
     }
 
     /*!
@@ -276,28 +279,21 @@ public:
      * For this method, the \a values parameter stores the mass flux
      * in normal direction of each phase. Negative values mean influx.
      */
-    void neumann(PrimaryVariables &values,
-                 const Element &element,
-                 const FVElementGeometry &fvGeometry,
-                 const Intersection &intersection,
-                 int scvIdx,
-                 const int boundaryFaceIdx) const
+    PrimaryVariables neumannAtPos(const GlobalPosition &globalPos) const
     {
-        values = 0;
-
-        GlobalPosition globalPos;
-        if (isBox)
-            globalPos = element.geometry().corner(scvIdx);
-        else
-            globalPos = intersection.geometry().center();
+        PrimaryVariables values(0.0);
 
         // negative values for injection
-        if ((globalPos[0] <= 75.+eps_) && (globalPos[0] >= 50.+eps_) && (globalPos[1] >= 10.-eps_))
+        if ((globalPos[0] <= 75.0+eps_) && (globalPos[0] >= 50.0+eps_) && (globalPos[1] >= 10.0-eps_))
         {
             values[contiWEqIdx] = -0.0;
-            values[contiNEqIdx] = -0.001, //mole flow, convertion to mass flow with molar mass M(Mesit.)=0,120 kg/mol --> 1.2e-4 kg/(sm)
+            //mole flow conversion to mass flow with molar mass M(Mesit.)=0,120 kg/mol --> 1.2e-4 kg/(sm)
+            //the 3p3c model uses mole fractions
+            values[contiNEqIdx] = -0.001;
             values[contiAEqIdx] = -0.0;
         }
+
+        return values;
     }
 
     // \}
@@ -316,21 +312,19 @@ public:
      * For this method, the \a values parameter stores primary
      * variables.
      */
-    void initialAtPos(PrimaryVariables &values, const GlobalPosition &globalPos) const
+    PrimaryVariables initialAtPos(const GlobalPosition &globalPos) const
     {
+        PrimaryVariables values;
         initial_(values, globalPos);
+        return values;
     }
 
     /*!
      * \brief Return the initial phase state inside a control volume.
      *
-     * \param vertex The vertex
-     * \param vIdxGlobal The global index of the vertex
      * \param globalPos The global position
      */
-    int initialPhasePresence(const Vertex &vertex,
-                             int &vIdxGlobal,
-                             const GlobalPosition &globalPos) const
+    int initialPhasePresence(const SubControlVolume& scv) const
     {
         return wgPhaseOnly;
     }
@@ -349,16 +343,13 @@ public:
         typedef Dune::BlockVector<Dune::FieldVector<double, 1> > ScalarField;
         ScalarField *Kxx = this->resultWriter().allocateManagedBuffer(numDofs);
 
-        FVElementGeometry fvGeometry;
-
         for (const auto& element : elements(this->gridView()))
         {
-            fvGeometry.update(this->gridView(), element);
-
-            for (int scvIdx = 0; scvIdx < fvGeometry.numScv; ++scvIdx)
+            auto fvGeometry = this->model().fvGeometries(element);
+            for (auto&& scv : fvGeometry.scvs())
             {
-                int dofIdxGlobal = this->model().dofMapper().subIndex(element, scvIdx, dofCodim);
-                (*Kxx)[dofIdxGlobal] = this->spatialParams().intrinsicPermeability(element, fvGeometry, scvIdx);
+                auto dofIdxGlobal = scv.dofIndex();
+                (*Kxx)[dofIdxGlobal] = this->spatialParams().intrinsicPermeability(scv);
             }
         }
 
@@ -379,8 +370,7 @@ private:
             Scalar pc = 9.81 * 1000.0 * (y - (-5E-4*x+5));
             if (pc < 0.0) pc = 0.0;
 
-            sw = invertPcgw_(pc,
-                             this->spatialParams().materialLawParams());
+            sw = invertPcgw_(pc, this->spatialParams().materialLawParamsAtPos(globalPos));
             if (sw < swr) sw = swr;
             if (sw > 1.-sgr) sw = 1.-sgr;
 
