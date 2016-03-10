@@ -93,6 +93,13 @@ public:
      */
     static Scalar pcgw(const Params &params, const Scalar sw)
     {
+//         if(!params.tableInitialized())
+//         {
+//             //make table
+//             for(int i =
+
+//         }
+//         return params.getPcgw(swToSwe(params, sw));
          return EffLaw::pcgw(params, swToSwe(params, sw));
     }
 
@@ -203,7 +210,13 @@ public:
      */
     static Scalar krw(const Params &params, Scalar sw, const Scalar sn)
     {
-        return EffLaw::krw(params, swToSwe(params, sw));
+      if(!params.tableKrwInitialized())
+      {
+            return EffLaw::krw(params, swToSwe(params, sw));
+
+      }
+
+        return params.getKrw(sw);
     }
 
     /*!
@@ -255,6 +268,8 @@ public:
     static Scalar kr(const Params &params, const int phaseIdx, const Scalar sw, const Scalar sn, const Scalar sg)
     {
       const Scalar st = sw+sn;
+      if(phaseIdx == 0)
+          return krw(params, sw, sn);
       return EffLaw::kr(params, phaseIdx, swToSwe(params, sw), sn, stToSte(params, st));
     }
 

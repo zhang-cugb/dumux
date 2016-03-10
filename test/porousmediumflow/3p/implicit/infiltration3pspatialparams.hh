@@ -117,6 +117,10 @@ public:
         // parameters for adsorption
         materialParams_.setKdNAPL(0.);
         materialParams_.setRhoBulk(1500.);
+
+        materialParams_.initTableKrw([this](Scalar S){return MaterialLaw::krw(materialParams_, S, 123);} );
+//         materialParams_.printTableKrw();
+
     }
 
     ~InfiltrationThreePSpatialParams()

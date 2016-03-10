@@ -29,6 +29,7 @@
 #define PARKERVANGEN_PARAMS_3P_HH
 
 #include <dune/common/fvector.hh>
+#include <memory>
 
 namespace Dumux
 {
@@ -40,9 +41,10 @@ class ParkerVanGen3PParams
 {
 public:
     typedef ScalarT Scalar;
+    typedef std::array<Scalar,500> SimpleTable;
 
     ParkerVanGen3PParams()
-    {betaGw_ = betaNw_ = betaGn_ = 1.0;}
+    {betaGw_ = betaNw_ = betaGn_ = 1.0; tableKrwInitialized_ = false;}
 
     ParkerVanGen3PParams(Scalar vgAlpha, Scalar vgn, Scalar KdNAPL, Scalar rhoBulk,
                          Dune::FieldVector<Scalar, 4> residualSaturation, Scalar betaNw = 1.0,
@@ -59,6 +61,7 @@ public:
         setBetaGn(betaGn);
         setBetaGw(betaGw);
         setRhoBulk(rhoBulk);
+        tableKrwInitialized_ = false;
     }
 
     /*!
@@ -263,6 +266,100 @@ public:
     void setKdNAPL(Scalar input)
     { KdNAPL_ = input; }
 
+    void initTableKrw(SimpleTable &input)
+    {
+        tableKrw_ = input;
+    }
+
+    void initTableKrg(SimpleTable &input)
+    {
+        tableKrg_ = input;
+    }
+
+    const SimpleTable &tableKrw() const
+    {
+        return tableKrw_;
+    }
+
+    const SimpleTable &tableKrg() const
+    {
+        return tableKrg_;
+    }
+
+    bool tableKrwInitialized() const
+    {
+        return tableKrwInitialized_;
+    }
+
+    void initTableKrw(std::function<Scalar(Scalar)> f)
+    {
+        tableKrw_ = std::unique_ptr<SimpleTable>(new SimpleTable());
+        Scalar swLow = -1.0;
+        Scalar swHigh = 2.0;
+        Scalar increment = (swHigh - swLow)/499;
+        for(auto &i : *tableKrw_)
+        {
+            i = f(swLow);
+            swLow += increment;
+        }
+        tableKrwInitialized_ = true;
+    }
+
+    void printTableKrw()
+    {
+        Scalar swLow = -1.0;
+        Scalar swHigh = 2.0;
+        Scalar increment = (swHigh - swLow)/499;
+        for(auto &i : *tableKrw_)
+        {
+          std::cout << "sw " << swLow << ", krw " << i << std::endl;
+          swLow += increment;
+        }
+    }
+
+    Scalar getKrw(const Scalar sw) const
+    {
+        Scalar swLow = -1.0;
+        Scalar swHigh = 2.0;
+//         Scalar m = 1000/(swHigh-swLow);
+//         Scalar c = -m;
+//         Scalar y = m*sw +c;
+        Scalar y = 499/(swHigh-swLow) * (sw-swLow);
+        int up = y;
+        int dn = up;
+        if(up >= y)
+            --dn;
+        else
+        {
+            ++dn;
+            std::swap(up,dn);
+        }
+        const Scalar tableUp = (*tableKrw_)[up];
+        const Scalar tableDn = (*tableKrw_)[dn];
+
+
+//         if(up < dn)
+//             DUNE_THROW(Dune::InvalidStateException, "up < dn");
+//         if(up == dn)
+//             DUNE_THROW(Dune::InvalidStateException, "up == dn");
+//         if(up>1000)
+//             DUNE_THROW(Dune::InvalidStateException, "up>1000");
+//         if(dn<0)
+//             DUNE_THROW(Dune::InvalidStateException, "dn<0");
+
+//         Scalar interpolated = ((*tableKrw_)[up]- (*tableKrw_)[dn])/(up-dn) * (y-dn) + (*tableKrw_)[dn];
+        return (tableUp- tableDn)/(up-dn) * (y-dn) + tableDn;
+//         std::cout << interpolated << std::endl;
+//         if(interpolated >= (*tableKrw_)[0] &&  interpolated <= (*tableKrw_)[499])
+//             return interpolated;
+//         else
+//         {
+//             std::cout << "up: " << up << " dn: " << dn << " result: " << interpolated << std::endl;
+//             std::cout << "(*tableKrw_)[0] " << (*tableKrw_)[0] << " (*tableKrw_)[1000] " << (*tableKrw_)[999]  << std::endl;
+//             DUNE_THROW(Dune::InvalidStateException, "bla");
+//         }
+
+    }
 
 private:
     Scalar vgAlpha_;
@@ -278,6 +375,10 @@ private:
     Scalar betaNw_;
     Scalar betaGn_;
     Scalar betaGw_;
+
+    std::unique_ptr<SimpleTable> tableKrw_;
+    bool tableKrwInitialized_;
+    SimpleTable tableKrg_;
 
     bool krRegardsSnr_ ;
 };
