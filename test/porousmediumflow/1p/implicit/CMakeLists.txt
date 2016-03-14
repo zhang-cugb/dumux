@@ -1,6 +1,7 @@
 add_subdirectory(pointsources)
 
 add_input_file_links()
+dune_symlink_to_source_files(FILES convergencetest.py)
 
 # isothermal tests
 add_dumux_test(test_box1p test_box1p test_box1p.cc
@@ -18,6 +19,13 @@ add_dumux_test(test_box1pwithamg test_box1pwithamg test_box1pwithamg.cc
                  --command "${CMAKE_CURRENT_BINARY_DIR}/test_box1pwithamg")
 
 add_dumux_test(test_cc1p test_cc1p test_cc1p.cc
+               python ${CMAKE_SOURCE_DIR}/bin/runtest.py
+                 --script fuzzy
+                 --files ${CMAKE_SOURCE_DIR}/test/references/1ptestcc-reference.vtu
+                         ${CMAKE_CURRENT_BINARY_DIR}/1ptestcc-00002.vtu
+                 --command "${CMAKE_CURRENT_BINARY_DIR}/test_cc1p")
+
+add_dumux_test(test_cc1pwell test_cc1pwell test_cc1pwell.cc
                python ${CMAKE_SOURCE_DIR}/bin/runtest.py
                  --script fuzzy
                  --files ${CMAKE_SOURCE_DIR}/test/references/1ptestcc-reference.vtu
@@ -109,6 +117,7 @@ test_box1pwithamg.cc
 test_cc1p1d3d.cc
 test_cc1p2d3d.cc
 test_cc1p.cc
+test_cc1pwell.cc
 test_cc1pniconduction.cc
 test_cc1pniconvection.cc
 test_cc1pwithamg.cc
