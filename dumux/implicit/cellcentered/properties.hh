@@ -42,6 +42,9 @@ namespace Properties
 
 //! The type tag for models based on the cell-centered scheme
 NEW_TYPE_TAG(CCModel, INHERITS_FROM(ImplicitBase));
+
+//! Choose whether to use a discrete or continuous extrusion factor
+NEW_PROP_TAG(ContinuousExtrusionFactor);
 }
 }
 

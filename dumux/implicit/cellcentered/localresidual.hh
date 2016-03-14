@@ -48,7 +48,8 @@ class CCLocalResidual : public ImplicitLocalResidual<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
 
     enum {
-        numEq = GET_PROP_VALUE(TypeTag, NumEq)
+        numEq = GET_PROP_VALUE(TypeTag, NumEq),
+        continuousExtrusionFactor = GET_PROP_VALUE(TypeTag, ContinuousExtrusionFactor)
     };
 
     typedef typename GridView::template Codim<0>::Entity Element;
@@ -136,7 +137,10 @@ protected:
 
         // multiply neumann fluxes with the area and the extrusion factor
         const auto& scv = this->problem_().model().fvGeometries().subControlVolume(scvf.insideScvIdx());
-        neumannFluxes *= scvf.area()*this->problem_().model().curVolVars(scv).extrusionFactor();
+        if(continuousExtrusionFactor)
+            neumannFluxes *= scvf.area()*this->problem_().extrusionFactorAtPos(scvf.center());
+        else
+            neumannFluxes *= scvf.area()*this->problem_().model().curVolVars(scv).extrusionFactor();
 
         // add fluxes to the residual
         for (int eqIdx = 0; eqIdx < numEq; ++eqIdx)

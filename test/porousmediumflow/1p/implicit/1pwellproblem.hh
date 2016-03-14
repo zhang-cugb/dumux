@@ -92,6 +92,9 @@ SET_TYPE_PROP(OnePTwoDThreeDTestProblem, Grid, Dune::FoamGrid<2, 3>);
 
 // Enable gravity
 SET_BOOL_PROP(OnePDupuitThiemProblem, ProblemEnableGravity, false);
+
+// Use a continuous extrusion factor
+SET_BOOL_PROP(OnePDupuitThiemProblem, ContinuousExtrusionFactor, true);
 }
 
 /*!

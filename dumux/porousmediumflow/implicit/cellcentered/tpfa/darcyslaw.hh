@@ -65,6 +65,7 @@ class CCTpfaDarcysLaw
     enum { dim = GridView::dimension} ;
     enum { dimWorld = GridView::dimensionworld} ;
     enum { numPhases = GET_PROP_VALUE(TypeTag, NumPhases)} ;
+    enum { continuousExtrusionFactor = GET_PROP_VALUE(TypeTag, ContinuousExtrusionFactor) } ;
 
     typedef Dune::FieldMatrix<Scalar, dimWorld, dimWorld> DimWorldMatrix;
     typedef Dune::FieldVector<Scalar, dimWorld> GlobalPosition;
@@ -218,6 +219,8 @@ private:
             Scalar tj = -1.0*calculateOmega_(outsideK, outsideScv);
 
             tij_ = scvFace_().area()*(ti * tj)/(ti + tj);
+            if(continuousExtrusionFactor)
+                tij_ *= problem_().extrusionFactorAtPos(scvFace_().center());
         }
         else
         {
@@ -227,6 +230,8 @@ private:
             Scalar ti = calculateOmega_(insideK, insideScv);
 
             tij_ = scvFace_().area()*ti;
+            if(continuousExtrusionFactor)
+                tij_ *= problem_().extrusionFactorAtPos(scvFace_().center());
         }
     }
 
@@ -250,7 +255,8 @@ private:
         distanceVector /= distanceVector.two_norm2();
 
         Scalar omega = Knormal * distanceVector;
-        omega *= problem_().model().curVolVars(scv).extrusionFactor();
+        if(!continuousExtrusionFactor)
+            omega *= problem_().model().curVolVars(scv).extrusionFactor();
 
         return omega;
     }
@@ -262,7 +268,8 @@ private:
         distanceVector /= distanceVector.two_norm2();
 
         Scalar omega = K * (distanceVector * scvFace_().unitOuterNormal());
-        omega *= problem_().model().curVolVars(scv).extrusionFactor();
+        if(!continuousExtrusionFactor)
+            omega *= problem_().model().curVolVars(scv).extrusionFactor();
 
         return omega;
     }

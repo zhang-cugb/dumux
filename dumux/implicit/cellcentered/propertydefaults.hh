@@ -65,6 +65,9 @@ SET_TYPE_PROP(CCModel, JacobianAssembler, Dumux::CCAssembler<TypeTag>);
 //! indicate that this is no box discretization
 SET_BOOL_PROP(CCModel, ImplicitIsBox, false);
 
+//! Choose whether to use a discrete or continuous extrusion factor
+SET_BOOL_PROP(CCModel, ContinuousExtrusionFactor, false);
+
 } // namespace Properties
 } // namespace Dumux
 
