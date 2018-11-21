@@ -301,11 +301,11 @@ public:
             std::vector<IndexType> scvfsIndexSet;
             scvfsIndexSet.reserve(numLocalFaces);
 
-            GeometryHelper geometryHelper(element, this->gridView());
+            GeometryHelper geometryHelper(element, this->gridView(), intersectionMapper_);
 
             for (const auto& intersection : intersections(this->gridView(), element))
             {
-                geometryHelper.updateLocalFace(intersectionMapper_, intersection);
+                geometryHelper.updateLocalFace(intersection);
                 const int localFaceIndex = geometryHelper.localFaceIndex();
 
                 // inner sub control volume faces

@@ -47,7 +47,7 @@ struct StaggeredFreeFlowDefaultFVGridGeometryTraits
     using SubControlVolume = CCSubControlVolume<GridView>;
     using SubControlVolumeFace = FreeFlowStaggeredSubControlVolumeFace<GridView>;
     using IntersectionMapper = ConformingGridIntersectionMapper<GridView>;
-    using GeometryHelper = FreeFlowStaggeredGeometryHelper<GridView>;
+    using GeometryHelper = FreeFlowStaggeredGeometryHelper<GridView, IntersectionMapper>;
 
     struct DofTypeIndices
     {
