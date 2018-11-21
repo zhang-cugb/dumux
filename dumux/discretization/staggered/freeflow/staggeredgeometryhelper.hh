@@ -83,7 +83,7 @@ inline static unsigned int directionIndex(Vector&& vector)
  * \brief Helper class constructing the dual grid finite volume geometries
  *        for the free flow staggered discretization method.
  */
-template<class GridView>
+template<class GridView, class IntersectionMapper>
 class FreeFlowStaggeredGeometryHelper
 {
     using Scalar = typename GridView::ctype;
@@ -110,12 +110,11 @@ class FreeFlowStaggeredGeometryHelper
 
 public:
 
-    FreeFlowStaggeredGeometryHelper(const Element& element, const GridView& gridView) : element_(element), elementGeometry_(element.geometry()), gridView_(gridView)
+    FreeFlowStaggeredGeometryHelper(const Element& element, const GridView& gridView, const IntersectionMapper& intersectionMapper) : element_(element), elementGeometry_(element.geometry()), gridView_(gridView), intersectionMapper_(intersectionMapper)
     { }
 
     //! update the local face
-    template<class IntersectionMapper>
-    void updateLocalFace(const IntersectionMapper& intersectionMapper_, const Intersection& intersection)
+    void updateLocalFace(const Intersection& intersection)
     {
         intersection_ = intersection;
         innerNormalFacePos_.clear();
@@ -201,11 +200,11 @@ private:
         }
 
         // Set the self Dof
-        this->axisData_.selfDof = gridView_.indexSet().subIndex(this->intersection_.inside(), inIdx, codimIntersection);
+        this->axisData_.selfDof = intersectionMapper_.globalIntersectionIndex(this->intersection_.inside(), inIdx);
         const auto self = getFacet_(inIdx, element_);
 
         // Set the opposite Dof
-        this->axisData_.oppositeDof = gridView_.indexSet().subIndex(this->intersection_.inside(), oppIdx, codimIntersection);
+        this->axisData_.oppositeDof = intersectionMapper_.globalIntersectionIndex(this->intersection_.inside(), oppIdx);
         const auto opposite = getFacet_(oppIdx, element_);
 
         // Set the Self to Opposite Distance
@@ -243,7 +242,7 @@ private:
         while(!inAxisForwardElementStack.empty())
         {
             int forwardIdx = inAxisForwardElementStack.size()-1;
-            this->axisData_.inAxisForwardDofs[forwardIdx] = gridView_.indexSet().subIndex(inAxisForwardElementStack.top(), inIdx, codimIntersection);
+            this->axisData_.inAxisForwardDofs[forwardIdx] = intersectionMapper_.globalIntersectionIndex(inAxisForwardElementStack.top(), inIdx);
             selfFace = getFacet_(inIdx, inAxisForwardElementStack.top());
             forwardFaceCoordinates[forwardIdx] = selfFace.geometry().center();
             inAxisForwardElementStack.pop();
@@ -299,7 +298,7 @@ private:
         while(!inAxisBackwardElementStack.empty())
         {
             int backwardIdx = inAxisBackwardElementStack.size()-1;
-            this->axisData_.inAxisBackwardDofs[backwardIdx] = gridView_.indexSet().subIndex(inAxisBackwardElementStack.top(), oppIdx, codimIntersection);
+            this->axisData_.inAxisBackwardDofs[backwardIdx] = intersectionMapper_.globalIntersectionIndex(inAxisBackwardElementStack.top(), oppIdx);
             oppFace = getFacet_(oppIdx, inAxisBackwardElementStack.top());
             backwardFaceCoordinates[backwardIdx] = oppFace.geometry().center();
             inAxisBackwardElementStack.pop();
@@ -428,7 +427,7 @@ private:
                     {
                         if(parallelElementStack.size() > 1)
                         {
-                            this->pairData_[numPairParallelIdx].parallelDofs[parallelElementStack.size()-2] = gridView_.indexSet().subIndex(parallelElementStack.top(), parallelLocalIdx, codimIntersection);
+                            this->pairData_[numPairParallelIdx].parallelDofs[parallelElementStack.size()-2] = intersectionMapper_.globalIntersectionIndex(parallelElementStack.top(), parallelLocalIdx);
                         }
                         this->pairData_[numPairParallelIdx].parallelDistances[parallelElementStack.size()-1] = setParallelPairDistances_(parallelElementStack.top(), parallelAxisIdx);
                         parallelElementStack.pop();
@@ -546,13 +545,14 @@ private:
     const Element element_; //!< The respective element
     const typename Element::Geometry elementGeometry_; //!< Reference to the element geometry
     const GridView gridView_; //!< The grid view
+    const IntersectionMapper intersectionMapper_;
     AxisData<Scalar> axisData_; //!< Data related to forward and backward faces
     std::array<PairData<Scalar, GlobalPosition>, numPairs> pairData_; //!< Collection of pair information related to normal and parallel faces
     std::vector<GlobalPosition> innerNormalFacePos_;
 };
 
-template<class GridView>
-int FreeFlowStaggeredGeometryHelper<GridView>::order_ = 1;
+template<class GridView, class IntersectionMapper>
+int FreeFlowStaggeredGeometryHelper<GridView, IntersectionMapper>::order_ = 1;
 
 } // end namespace Dumux
 

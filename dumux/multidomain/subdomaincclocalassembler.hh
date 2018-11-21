@@ -37,7 +37,7 @@
 #include <dumux/discretization/elementsolution.hh>
 #include <dumux/assembly/numericepsilon.hh>
 #include <dumux/assembly/diffmethod.hh>
-#include <dumux/assembly/fvlocalassemblerbase.hh>
+#include <mydumux/assembly/fvlocalassemblerbase.hh>
 
 namespace Dumux {
 

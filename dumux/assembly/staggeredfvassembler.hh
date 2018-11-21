@@ -33,7 +33,7 @@
 #include <dumux/common/timeloop.hh>
 #include <dumux/discretization/methods.hh>
 
-#include <dumux/multidomain/fvassembler.hh>
+#include <mydumux/multidomain/fvassembler.hh>
 #include <dumux/multidomain/staggeredtraits.hh>
 #include <dumux/multidomain/staggeredcouplingmanager.hh>
 

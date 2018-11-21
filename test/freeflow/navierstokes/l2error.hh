@@ -87,7 +87,13 @@ public:
                     directionIndex[dofIdxFace] = dirIdx;
                     errorVelocity[dofIdxFace] = squaredDiff_(analyticalSolutionFace, numericalSolutionFace);
                     velocityReference[dofIdxFace] = squaredDiff_(analyticalSolutionFace, 0.0);
-                    const Scalar staggeredHalfVolume = 0.5 * scv.volume();
+                    Scalar staggeredHalfVolume = 0.5 * scv.volume();
+
+                    if (scvf.neighbor() && scvf.inside().level() < scvf.outside().level())
+                    {
+                        staggeredHalfVolume *= 0.5;
+                    }
+
                     staggeredVolume[dofIdxFace] = staggeredVolume[dofIdxFace] + staggeredHalfVolume;
                 }
             }

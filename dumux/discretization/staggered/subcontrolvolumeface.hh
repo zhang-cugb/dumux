@@ -39,7 +39,7 @@ namespace Dumux {
  * \ingroup StaggeredDiscretization
  * \brief Base class for a staggered grid geometry helper
  */
-template<class GridView>
+template<class GridView, class IntersectionMapper>
 class BaseStaggeredGeometryHelper
 {
     using Element = typename GridView::template Codim<0>::Entity;
@@ -48,16 +48,16 @@ class BaseStaggeredGeometryHelper
 
 public:
 
-    BaseStaggeredGeometryHelper(const Element& element, const GridView& gridView)
+    BaseStaggeredGeometryHelper(const Element& element, const GridView& gridView, const IntersectionMapper& intersectionMapper)
     : element_(element)
     , gridView_(gridView)
+    , intersectionMapper_(intersectionMapper)
     { }
 
     /*!
     * \brief Updates the current face, i.e. sets the correct intersection
     */
-    template<class IntersectionMapper>
-    void updateLocalFace(const IntersectionMapper& intersectionMapper, const Intersection& intersection)
+    void updateLocalFace(const Intersection& intersection)
     {
         intersection_ = intersection;
     }
@@ -69,7 +69,7 @@ public:
    {
        //TODO: use proper intersection mapper!
        const auto inIdx = intersection_.indexInInside();
-       return gridView_.indexSet().subIndex(intersection_.inside(), inIdx, codimIntersection);
+       return intersectionMapper_.globalIntersectionIndex(intersection_.inside(), inIdx);
    }
 
    /*!
@@ -84,6 +84,7 @@ private:
    Intersection intersection_; //!< The intersection of interest
    const Element element_; //!< The respective element
    const GridView gridView_;
+   const IntersectionMapper intersectionMapper_;
 };
 
 

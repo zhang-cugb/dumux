@@ -34,15 +34,15 @@
 #include <dumux/discretization/fvproperties.hh>
 
 #include <dumux/discretization/cellcentered/elementboundarytypes.hh>
-#include <dumux/assembly/staggeredlocalresidual.hh>
+#include <mydumux/assembly/staggeredlocalresidual.hh>
 
 #include <dumux/discretization/cellcentered/subcontrolvolume.hh>
-#include <dumux/discretization/staggered/gridvariables.hh>
+#include <mydumux/discretization/staggered/gridvariables.hh>
 #include <dumux/discretization/staggered/gridfluxvariablescache.hh>
-#include <dumux/discretization/staggered/fvgridgeometry.hh>
+#include <mydumux/discretization/staggered/fvgridgeometry.hh>
 #include <dumux/discretization/staggered/gridfacevariables.hh>
-#include <dumux/discretization/staggered/facesolution.hh>
-#include <dumux/discretization/staggered/subcontrolvolumeface.hh>
+#include <mydumux/discretization/staggered/facesolution.hh>
+#include <mydumux/discretization/staggered/subcontrolvolumeface.hh>
 
 #include <dune/istl/multitypeblockvector.hh>
 #include <dune/istl/multitypeblockmatrix.hh>

@@ -27,7 +27,7 @@
 
 #include <dumux/common/reservedblockvector.hh>
 #include <dumux/common/properties.hh>
-#include <dumux/assembly/fvlocalresidual.hh>
+#include <mydumux/assembly/fvlocalresidual.hh>
 
 namespace Dumux {
 

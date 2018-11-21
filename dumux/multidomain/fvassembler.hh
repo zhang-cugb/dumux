@@ -40,7 +40,7 @@
 #include "couplingjacobianpattern.hh"
 #include "subdomaincclocalassembler.hh"
 #include "subdomainboxlocalassembler.hh"
-#include "subdomainstaggeredlocalassembler.hh"
+#include <mydumux/multidomain/subdomainstaggeredlocalassembler.hh>
 
 namespace Dumux {
 
