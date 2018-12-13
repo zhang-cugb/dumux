@@ -26,7 +26,7 @@
 
 #include <dumux/common/properties.hh>
 #include <dumux/discretization/methods.hh>
-#include <dumux/freeflow/navierstokes/staggered/localresidual.hh>
+#include <mydumux/freeflow/navierstokes/staggered/localresidual.hh>
 
 namespace Dumux
 {

@@ -35,7 +35,7 @@
 #include <dumux/common/numericdifferentiation.hh>
 #include <dumux/assembly/numericepsilon.hh>
 #include <dumux/assembly/diffmethod.hh>
-#include <dumux/assembly/fvlocalassemblerbase.hh>
+#include <mydumux/assembly/fvlocalassemblerbase.hh>
 #include <dumux/assembly/entitycolor.hh>
 #include <dumux/assembly/partialreassembler.hh>
 #include <dumux/discretization/fluxstencil.hh>

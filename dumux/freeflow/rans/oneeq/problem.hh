@@ -29,7 +29,7 @@
 #include <dumux/discretization/localview.hh>
 #include <dumux/discretization/staggered/elementsolution.hh>
 #include <dumux/discretization/methods.hh>
-#include <dumux/freeflow/rans/problem.hh>
+#include <mydumux/freeflow/rans/problem.hh>
 
 #include "model.hh"
 

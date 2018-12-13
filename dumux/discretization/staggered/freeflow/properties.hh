@@ -29,18 +29,18 @@
 #define DUMUX_STAGGERD_FREE_FLOW_PROPERTIES_HH
 
 #include <dumux/common/properties.hh>
-#include <dumux/common/intersectionmapper.hh>
+#include <mydumux/common/intersectionmapper.hh>
 #include <dumux/common/defaultmappertraits.hh>
 
 #include <dumux/discretization/staggered/properties.hh>
-#include <dumux/discretization/staggered/fvgridgeometry.hh>
+#include <mydumux/discretization/staggered/fvgridgeometry.hh>
 #include <dumux/freeflow/properties.hh>
 
-#include "facevariables.hh"
+#include <mydumux/discretization/staggered/freeflow/facevariables.hh>
 #include "boundarytypes.hh"
 #include "velocityoutput.hh"
-#include "fvgridgeometrytraits.hh"
-#include "gridvolumevariables.hh"
+#include <mydumux/discretization/staggered/freeflow/fvgridgeometrytraits.hh>
+#include <mydumux/discretization/staggered/freeflow/gridvolumevariables.hh>
 
 namespace Dumux
 {
