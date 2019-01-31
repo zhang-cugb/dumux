@@ -100,9 +100,12 @@ SET_PROP(StaggeredFreeFlowModel, GridVolumeVariables)
 {
 private:
     using Problem = typename GET_PROP_TYPE(TypeTag, Problem);
+    using GridView = typename GET_PROP_TYPE(TypeTag, GridView);
+    using SubControlVolume = typename GET_PROP_TYPE(TypeTag, FVGridGeometry)::SubControlVolume;
+    using SubControlVolumeFace = typename GET_PROP_TYPE(TypeTag, FVGridGeometry)::SubControlVolumeFace;
     using VolumeVariables = typename GET_PROP_TYPE(TypeTag, VolumeVariables);
     static constexpr auto enableCache = GET_PROP_VALUE(TypeTag, EnableGridVolumeVariablesCache);
-    using Traits = StaggeredGridDefaultGridVolumeVariablesTraits<Problem, VolumeVariables>;
+    using Traits = StaggeredGridDefaultGridVolumeVariablesTraits<Problem, VolumeVariables, GridView, SubControlVolume, SubControlVolumeFace>;
 public:
     using type = StaggeredGridVolumeVariables<Traits, enableCache>;
 };
