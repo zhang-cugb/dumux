@@ -27,7 +27,7 @@
 
 #include <dune/common/exceptions.hh>
 
-#include <dumux/freeflow/volumevariables.hh>
+#include <mydumux/freeflow/volumevariables.hh>
 
 namespace Dumux {
 
