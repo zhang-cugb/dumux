@@ -1,6 +1,7 @@
 [Grid]
-UpperRight = 6.28 6.28
-Cells = 70 70
+LowerLeft = 0 0
+UpperRight = 3 3
+Cells = 20 20
 
 [Problem]
 Name = test_sincos_steady # name passed to the output routines

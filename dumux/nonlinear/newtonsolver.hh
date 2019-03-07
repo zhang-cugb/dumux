@@ -1061,6 +1061,23 @@ private:
         const auto bTmp = VectorConverter<SolutionVector>::multiTypeToBlockVector(b);
         assert(bTmp.size() == numRows);
 
+        std::cout << "printing face stuff " << std::endl;
+        Dune::printvector(std::cout, b[Dune::index_constant<1>()], "","");
+
+        Scalar fu = -1;
+
+        for (const auto& f : b[Dune::index_constant<1>()])
+            fu = std::max(fu, f[0]);
+
+        std::cout << "max resi is " << fu << std::endl;
+
+        int numFlipped =0;
+        for (const auto& i : ::hasFlippedSigns)
+            if (i)
+                ++numFlipped;
+
+        std::cout << numFlipped << "vels are flipped " << std::endl;
+
         // create a blockvector to which the linear solver writes the solution
         using VectorBlock = typename Dune::FieldVector<Scalar, 1>;
         using BlockVector = typename Dune::BlockVector<VectorBlock>;

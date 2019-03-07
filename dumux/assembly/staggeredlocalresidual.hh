@@ -217,7 +217,18 @@ public:
     {
         FaceResidualValue residual(0.0);
         asImp().evalSourceForFace(residual, this->problem(), element, fvGeometry, elemVolVars, elemFaceVars, scvf);
+        if (::printstuff)
+        {
+            std::cout << "after source " << residual << std::endl;
+
+            std::cout << "source prob is at  " << scvf.center()  << " is " << this->problem().sourceAtPos(scvf.center()) << std::endl;
+
+        }
         asImp().evalFluxForFace(residual, this->problem(), element, fvGeometry, elemVolVars, elemFaceVars, bcTypes, elemFluxVarsCache, scvf);
+        if (::printstuff)
+            std::cout << "after flux " << residual << std::endl;
+
+
 
         return residual;
     }

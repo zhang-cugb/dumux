@@ -244,7 +244,13 @@ public:
                                                const ElementVolumeVariables& elemVolVars,
                                                const ElementFaceVariables& elemFaceVars) const
     {
+        if (::printstuff)
+            std::cout << "computing resi for dofpos " << scvf.center()  << std::endl;
+
         auto residual = evalLocalFluxAndSourceResidualForFace(scvf, elemVolVars, elemFaceVars);
+
+        if (::printstuff)
+            std::cout << "after flux+source: " << residual << std::endl;
 
         if (!this->assembler().isStationaryProblem())
             residual += evalLocalStorageResidualForFace(scvf);
@@ -361,8 +367,14 @@ private:
         const auto residual = this->asImp_().assembleFaceJacobianAndResidualImpl(jacRow[domainId], gridVariablesI);
 
         for(auto&& scvf : scvfs(this->fvGeometry()))
+        {
             res[scvf.dofIndex()] += residual[scvf.localFaceIdx()];
 
+            if (scvf.dofIndex() == 423)
+            {
+                std::cout << "found: " << residual[scvf.localFaceIdx()] << std::endl;
+            }
+        }
         // for the coupling blocks
         using namespace Dune::Hybrid;
         static constexpr auto otherDomainIds = makeIncompleteIntegerSequence<JacobianMatrixRow::size(), domainId>{};
@@ -650,7 +662,16 @@ public:
 
         // treat the local residua of the face dofs:
         for (auto&& scvf : scvfs(fvGeometry))
+        {
+            if (scvf.dofIndex() == 423)
+                ::printstuff = true;
+
+
             origResiduals[scvf.localFaceIdx()] = this->evalLocalResidualForFace(scvf);
+
+            ::printstuff = false;
+
+        }
 
         //////////////////////////////////////////////////////////////////////////////////////////////////
         //                                                                                              //

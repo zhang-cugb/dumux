@@ -198,11 +198,17 @@ public:
         // because the fluxes are calculated over the staggered face at the center of the element.
         const auto& insideVolVars = elemVolVars[scvf.insideScvIdx()];
 
+        if (::printstuff)
+          int y = 0;
+
+        if (sign(velocitySelf) != sign(velocityOpposite))
+            ::hasFlippedSigns[scvf.dofIndex()] = true;
+
         // Advective flux.
         if (problem.enableInertiaTerms())
         {
             // Get the average velocity at the center of the element (i.e. the location of the staggered face).
-            const Scalar transportingVelocity = (velocitySelf + velocityOpposite) * 0.5;
+            Scalar transportingVelocity = (velocitySelf + velocityOpposite) * 0.5;
 
             // Check if the the velocity of the dof at interest lies up- or downstream w.r.t. to the transporting velocity.
             const bool selfIsUpstream = scvf.directionSign() != sign(transportingVelocity);
@@ -219,9 +225,14 @@ public:
             const Scalar momentum = selfIsUpstream ? computeMomentum(velocitySelf, velocityOpposite)
                                                    : computeMomentum(velocityOpposite, velocitySelf);
 
+
             // Account for the orientation of the staggered face's normal outer normal vector
             // (pointing in opposite direction of the scvf's one).
             frontalFlux += transportingVelocity * momentum * -1.0 * scvf.directionSign();
+
+            if (::printstuff)
+                std::cout << "adv frontal flux " << transportingVelocity * momentum * -1.0 * scvf.directionSign() << std::endl;
+
         }
 
         // Diffusive flux.
@@ -233,6 +244,9 @@ public:
             = getParamFromGroup<bool>(problem.paramGroup(), "FreeFlow.EnableUnsymmetrizedVelocityGradient", false);
         const Scalar factor = enableUnsymmetrizedVelocityGradient ? 1.0 : 2.0;
         frontalFlux -= factor * insideVolVars.effectiveViscosity() * gradV;
+
+        if (::printstuff)
+            std::cout << "diff frontal flux " << -factor * insideVolVars.effectiveViscosity() * gradV << std::endl;
 
         // The pressure term.
         // If specified, the pressure can be normalized using the initial value on the scfv of interest.
@@ -246,6 +260,9 @@ public:
         // (pointing in opposite direction of the scvf's one).
         frontalFlux += pressure * -1.0 * scvf.directionSign();
 
+        if (::printstuff)
+            std::cout << "pressure frontal flux " << pressure * -1.0 * scvf.directionSign() << std::endl;
+
         // Handle inflow or outflow conditions.
         // Treat the staggered half-volume adjacent to the boundary as if it was on the opposite side of the boundary.
         // The respective face's outer normal vector will point in the same direction as the scvf's one.
@@ -254,6 +271,12 @@ public:
 
         // Account for the staggered face's area. For rectangular elements, this equals the area of the scvf
         // our velocity dof of interest lives on.
+
+        if (scvf.dofIndex() == 423 && ::printstuff)
+        {
+            std::cout << "frontal momentum flux " << frontalFlux * scvf.area() * insideVolVars.extrusionFactor() << std::endl;
+        }
+
         return frontalFlux * scvf.area() * insideVolVars.extrusionFactor();
    }
 

@@ -22,6 +22,13 @@
  * \brief Test for the instationary staggered grid Navier-Stokes model
  *        with analytical solution.
  */
+
+bool printstuff = false;
+
+#include <vector>
+
+std::vector<bool> hasFlippedSigns;
+
 #include <config.h>
 
 #include <ctime>
@@ -205,6 +212,9 @@ int main(int argc, char** argv) try
     SolutionVector x;
     x[FVGridGeometry::cellCenterIdx()].resize(fvGridGeometry->numCellCenterDofs());
     x[FVGridGeometry::faceIdx()].resize(fvGridGeometry->numFaceDofs());
+    problem->applyInitialSolution(x);
+
+    ::hasFlippedSigns.resize(fvGridGeometry->numFaceDofs(), false);
 
     // the grid variables
     using GridVariables = GetPropType<TypeTag, Properties::GridVariables>;
