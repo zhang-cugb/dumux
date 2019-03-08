@@ -691,9 +691,9 @@ private:
                 assembleTimer.start();
                 assembleLinearSystem(uCurrentIter);
                 assembleTimer.stop();
-
+/*
                 if (numSteps_ == 1)
-                    exit(0);
+                    exit(0);*/
 
                 ///////////////
                 // linear solve
