@@ -91,8 +91,9 @@ SET_PROP(StaggeredFreeFlowModel, FaceVariables)
 private:
     using FacePrimaryVariables = typename GET_PROP_TYPE(TypeTag, FacePrimaryVariables);
     using GridView = typename GET_PROP_TYPE(TypeTag, GridView);
+    using ModelTraits = typename GET_PROP_TYPE(TypeTag, ModelTraits);
 public:
-    using type = StaggeredFaceVariables<FacePrimaryVariables, GridView::dimension>;
+    using type = StaggeredFaceVariables<ModelTraits, FacePrimaryVariables, GridView::dimension>;
 };
 
 //! Set the default global volume variables cache vector class
