@@ -13,3 +13,8 @@ dune_add_test(SOURCES test_thermalconductivitysomerton.cc
                       --files ${CMAKE_SOURCE_DIR}/test/references/thermalconductivitysomerton-reference.dat
                               ${CMAKE_CURRENT_BINARY_DIR}/somerton_lambda_eff.dat
                       --command "${CMAKE_CURRENT_BINARY_DIR}/test_thermalconductivitysomerton")
+
+dune_add_test(SOURCES test_2p_materiallaw.cc
+              LABELS unit material)
+
+dune_symlink_to_source_files(FILES test_2p_materiallaw.input)
