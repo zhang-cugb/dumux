@@ -20,13 +20,14 @@
  * \file
  * \ingroup Common
  * \brief A wrapper that can either contain an object of T or be empty.
- *        This might be used as a workaround for non-default constructible classes.
- * \note  Replace this with std::optional when C++17 is available
  */
 #ifndef DUMUX_COMMON_OPTIONAL_HH
 #define DUMUX_COMMON_OPTIONAL_HH
 
 #include <utility>
+#include <limits>
+#include <cmath>
+#include <type_traits>
 
 #include <dune/common/typeutilities.hh>
 
@@ -36,6 +37,7 @@ namespace Dumux {
  * \ingroup Common
  * \brief A wrapper that can either contain an object of T or be empty
  * \tparam T Type of wrapped objects
+ * \note  Replace this with std::optional when C++17 is available
  */
 template<class T>
 class Optional
@@ -147,6 +149,31 @@ private:
     T* p_;
 };
 
+/*!
+ * \ingroup Common
+ * \brief A type for an optional floating point number (if NaN can be spared as a valid result)
+ * \tparam T Type of wrapped floating point number
+ */
+template<class T>
+struct OptionalFloatingPointNumber
+{
+    static_assert(std::numeric_limits<T>::has_quiet_NaN, "T has to be able to represent a quiet NaN!");
+
+    OptionalFloatingPointNumber() = default;
+
+    OptionalFloatingPointNumber(T value) : value_(value) {}
+
+    T value() const
+    { return value_; }
+
+    operator bool() const
+    {
+        using std::isnan;
+        return !isnan(value_);
+    }
+private:
+    T value_ = std::numeric_limits<T>::quiet_NaN();
+};
 
 } // namespace Dumux
 
