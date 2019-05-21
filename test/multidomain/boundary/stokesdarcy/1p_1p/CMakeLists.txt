@@ -1,5 +1,5 @@
 add_input_file_links()
-
+add_subdirectory(mortar)
 add_executable(test_md_boundary_darcy1p_stokes1p EXCLUDE_FROM_ALL main.cc)
 
 dune_add_test(NAME test_md_boundary_darcy1p_stokes1p_horizontal
