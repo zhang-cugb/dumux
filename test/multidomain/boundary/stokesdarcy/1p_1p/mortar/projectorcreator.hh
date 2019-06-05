@@ -71,11 +71,12 @@ public:
         if (mv == OnePMortarVariableType::pressure)
         {
             // Currently we only support schemes with piecewise constant fluxes
-            const auto fluxBasis = makeBasis(solver1.gridGeometryPointer()->gridView(), lagrange<0>());
+            const auto fluxBasis1 = makeBasis(solver1.gridGeometryPointer()->gridView(), lagrange<0>());
+            const auto fluxBasis2 = makeBasis(solver2.gridGeometryPointer()->gridView(), lagrange<0>());
             const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
 
-            auto baseProjectors1 = makeProjectorPair(fluxBasis, mortarBasis, glue1);
-            auto baseProjectors2 = makeProjectorPair(fluxBasis, mortarBasis, glue2);
+            auto baseProjectors1 = makeProjectorPair(fluxBasis1, mortarBasis, glue1);
+            auto baseProjectors2 = makeProjectorPair(fluxBasis2, mortarBasis, glue2);
 
             using P = MortarProjector<MortarSolution>;
             auto p1 = std::make_shared<P>(std::move(baseProjectors1.second), std::move(baseProjectors1.first));

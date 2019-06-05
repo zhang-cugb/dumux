@@ -12,7 +12,7 @@ SolverType = Darcy
 DiscretizationScheme = Tpfa
 Grid.LowerLeft = 0 0
 Grid.UpperRight = 1 1
-Grid.Cells = 80 80
+Grid.Cells = 60 80
 Problem.Name = darcy1
 Problem.IsOnNegativeMortarSide = false
 Problem.UseDirichletLeft = false
@@ -47,13 +47,14 @@ Problem.SourceValue = 0
 [Mortar]
 Grid.LowerLeft = 0 1
 Grid.UpperRight = 1 1
-Grid.Cells = 80
-VariableType = Pressure
+Grid.Cells = 70
+VariableType = Flux
 
 [InterfaceSolver]
 Verbosity = 2
 ResidualReduction = 1e-6
 MaxIterations = 2000
+LinearSolverType = GMRes
 
 [Vtk]
 OutputName = mortarcoupling

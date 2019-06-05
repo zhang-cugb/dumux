@@ -24,6 +24,7 @@
 #ifndef DUMUX_MORTAR_PROJECTOR_HH
 #define DUMUX_MORTAR_PROJECTOR_HH
 
+#include <dumux/linear/seqsolverbackend.hh>
 #include <dumux/discretization/projection/projector.hh>
 
 namespace Dumux {
@@ -113,9 +114,17 @@ public:
      */
     MortarSolution projectSubDomainToMortar(const MortarSolution& x) const override
     {
+        const auto& M = mortarToSubDomainProjector_.massMatrix();
+        const auto& B = mortarToSubDomainProjector_.projectionMatrix();
+
+        auto up = x;
+        SSORCGBackend solver;
+        solver.solve(M, up, x);
+
         MortarSolution result;
-        result.resize(mortarToSubDomainProjector_.projectionMatrix().M());
-        mortarToSubDomainProjector_.projectionMatrix().mtv(x, result);
+        result.resize(B.M());
+
+        B.mtv(up, result);
         return result;
     }
 

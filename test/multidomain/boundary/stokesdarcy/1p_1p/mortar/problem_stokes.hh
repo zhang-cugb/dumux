@@ -38,6 +38,8 @@
 #include <dumux/discretization/staggered/freeflow/properties.hh>
 #include <dumux/freeflow/navierstokes/model.hh>
 
+#include "mortarvariabletype.hh"
+
 namespace Dumux {
 template <class TypeTag>
 class StokesSubProblem;
@@ -107,11 +109,9 @@ public:
     , eps_(1e-6)
     , isOnNegativeMortarSide_(getParamFromGroup<bool>(paramGroup, "Problem.IsOnNegativeMortarSide"))
     {
-        const auto mortarVariable = getParamFromGroup<std::string>("Mortar", "VariableType");
-        if (mortarVariable == "Pressure")
-            useDirichletAtInterface_ = false;
-        else if (mortarVariable == "Flux")
-            DUNE_THROW(Dune::NotImplemented, "Flux coupling stokes problem");
+        const auto mv = getParamFromGroup<std::string>("Mortar", "VariableType");
+        mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure
+                                               : OnePMortarVariableType::flux;
 
         problemName_  =  getParamFromGroup<std::string>(paramGroup, "Vtk.OutputName") + "_" + getParamFromGroup<std::string>(this->paramGroup(), "Problem.Name");
     }
@@ -166,7 +166,7 @@ public:
 
         else if (isOnMortarInterface(globalPos))
         {
-            if (useDirichletAtInterface_)
+            if (mortarVariableType_ == OnePMortarVariableType::flux)
                 values.setDirichlet(scvf.directionIndex());
             else
                 values.setNeumann(scvf.directionIndex());
@@ -237,7 +237,7 @@ public:
     {
         NumEqVector values(0.0);
 
-        if (isOnMortarInterface(scvf.ipGlobal()) && !useDirichletAtInterface_)
+        if (isOnMortarInterface(scvf.ipGlobal()) && mortarVariableType_ != OnePMortarVariableType::flux)
         {
             // apply mortar pressure to momentum balance
             assert(mortarProjection_.size() == this->fvGridGeometry().gridView().size(0));
@@ -297,6 +297,16 @@ public:
                || (!isOnNegativeMortarSide_ && onUpperBoundary_(globalPos));
     }
 
+    //! Returns true if this domain is on the "negative" side of mortar
+    bool isOnNegativeMortarSide() const
+    { return isOnNegativeMortarSide_; }
+
+    //! Define the meaning of the mortar variable
+    void setMortarVariableType(OnePMortarVariableType mv)
+    {
+        mortarVariableType_ = mv;
+    }
+
 private:
     bool onLeftBoundary_(const GlobalPosition &globalPos) const
     { return globalPos[0] < this->fvGridGeometry().bBoxMin()[0] + eps_; }
@@ -317,7 +327,7 @@ private:
 
     bool isOnNegativeMortarSide_;
     bool useHomogeneousSetup_;
-    bool useDirichletAtInterface_;
+    OnePMortarVariableType mortarVariableType_;
 };
 } // end namespace Dumux
 

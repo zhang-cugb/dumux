@@ -72,7 +72,7 @@ struct SubDomainTraits
 // Define grid and basis for mortar domain
 struct MortarTraits
 {
-    static constexpr int basisOrder = 0;
+    static constexpr int basisOrder = 1;
 
     using Scalar = double;
     using Grid = Dune::FoamGrid<1, 2>;
@@ -87,8 +87,6 @@ using DarcySolverType = Dumux::DarcySolver<SubDomainTypeTag>;
 
 template<class SubDomainTypeTag>
 using StokesSolverType = Dumux::StokesSolver<SubDomainTypeTag>;
-
-using Preconditioner = Dumux::OnePMortarPreconditioner<typename MortarTraits::SolutionVector>;
 
 // translate mortar variable into variable name for output
 std::string getMortarVariableName(Dumux::OnePMortarVariableType mv)
@@ -179,15 +177,25 @@ void solveMortar(Dumux::OnePMortarVariableType mv)
     solver2->problemPointer()->setUseHomogeneousSetup(true);
 
     // create preconditioner
-    Dumux::OnePMortarPreconditioner<MortarSolution> prec(mv);
+    using Prec = Dumux::OnePMortarPreconditioner<Solver1, Reconstructor1,
+                                                 Solver2, Reconstructor2, MortarSolution>;
+    Prec prec(solver1, projector1, solver2, projector2, *mortarGridGeometry, mv);
 
-    // create linear solver using our linear operator
-    // Dune::RestartedGMResSolver<MortarSolution> cgSolver(op, prec, reduction, maxIt, maxIt, verbosity);
-    Dune::CGSolver<MortarSolution> cgSolver(op, prec, reduction, maxIt, verbosity);
-
+    // apply linear solver using our linear operator
     deltaMortarVariable *= -1.0;
     Dune::InverseOperatorResult result;
-    cgSolver.apply(*mortarSolution, deltaMortarVariable, result);
+
+    const auto lsType = getParam<std::string>("InterfaceSolver.LinearSolverType");
+    if (lsType == "CG")
+    {
+        Dune::CGSolver<MortarSolution> cgSolver(op, prec, reduction, maxIt, verbosity);
+        cgSolver.apply(*mortarSolution, deltaMortarVariable, result);
+    }
+    else if (lsType == "GMRes")
+    {
+        Dune::RestartedGMResSolver<MortarSolution> gmresSolver(op, prec, reduction, maxIt, maxIt, verbosity);
+        gmresSolver.apply(*mortarSolution, deltaMortarVariable, result);
+    }
 
     if (!result.converged)
         DUNE_THROW(Dune::InvalidStateException, "CG solver did not converge with given maximum number of iterations");
