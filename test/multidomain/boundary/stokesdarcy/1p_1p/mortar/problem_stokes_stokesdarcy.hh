@@ -38,8 +38,6 @@
 #include <dumux/discretization/staggered/freeflow/properties.hh>
 #include <dumux/freeflow/navierstokes/model.hh>
 
-#include "mortarvariabletype.hh"
-
 namespace Dumux {
 template <class TypeTag>
 class StokesSubProblem;
@@ -109,9 +107,11 @@ public:
     , eps_(1e-6)
     , isOnNegativeMortarSide_(getParamFromGroup<bool>(paramGroup, "Problem.IsOnNegativeMortarSide"))
     {
-        const auto mv = getParamFromGroup<std::string>("Mortar", "VariableType");
-        mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure
-                                               : OnePMortarVariableType::flux;
+        const auto mortarVariable = getParamFromGroup<std::string>("Mortar", "VariableType");
+        if (mortarVariable == "Pressure")
+            useDirichletAtInterface_ = false;
+        else if (mortarVariable == "Flux")
+            DUNE_THROW(Dune::NotImplemented, "Flux coupling stokes problem");
 
         problemName_  =  getParamFromGroup<std::string>(paramGroup, "Vtk.OutputName") + "_" + getParamFromGroup<std::string>(this->paramGroup(), "Problem.Name");
     }
@@ -156,43 +156,38 @@ public:
 
         const auto& globalPos = scvf.dofPosition();
 
-        if(onLeftBoundary_(globalPos) || onRightBoundary_(globalPos))
+        if (onLeftBoundary_(globalPos) || onRightBoundary_(globalPos))
         {
             values.setDirichlet(Indices::pressureIdx);
             // values.setDirichlet(Indices::velocityXIdx);
             // values.setDirichlet(Indices::velocityYIdx);
+
+            // values.setNeumann(Indices::velocityXIdx);
+            // values.setNeumann(Indices::velocityYIdx);
         }
         // values.setDirichlet(Indices::pressureIdx);
 
         else if (isOnMortarInterface(globalPos))
         {
-            if (mortarVariableType_ == OnePMortarVariableType::flux)
+            values.setNeumann(Indices::conti0EqIdx);
+            if (useDirichletAtInterface_)
                 values.setDirichlet(scvf.directionIndex());
             else
                 values.setNeumann(scvf.directionIndex());
             values.setBJS(1 - scvf.directionIndex());
         }
+
         else
         {
             // values.setDirichlet(Indices::pressureIdx);
             values.setDirichlet(Indices::velocityXIdx);
             values.setDirichlet(Indices::velocityYIdx);
+
+            // values.setAllNeumann();
         }
 
         return values;
     }
-
-    /*!
-     * \brief Evaluate the exact solution at a given position.
-     */
-    NumEqVector exact(const GlobalPosition& globalPos) const
-    { DUNE_THROW(Dune::NotImplemented, "Exact solution for stokes domain"); }
-
-    /*!
-     * \brief Evaluate the exact normal velocity at a given position.
-     */
-    GlobalPosition exactFlux(const GlobalPosition& globalPos) const
-    { DUNE_THROW(Dune::NotImplemented, "Exact flux for stokes domain"); }
 
     /*!
      * \brief Evaluates the velocity boundary conditions for a Dirichlet sub-control volume face.
@@ -249,7 +244,7 @@ public:
     {
         NumEqVector values(0.0);
 
-        if (isOnMortarInterface(scvf.ipGlobal()) && mortarVariableType_ != OnePMortarVariableType::flux)
+        if (isOnMortarInterface(scvf.ipGlobal()) && !useDirichletAtInterface_)
         {
             // apply mortar pressure to momentum balance
             assert(mortarProjection_.size() == this->fvGridGeometry().gridView().size(0));
@@ -259,6 +254,10 @@ public:
             // mass flux
             const auto v = elemFaceVars[scvf].velocitySelf()*scvf.directionSign();
             values[Indices::conti0EqIdx] = v*elemVolVars[scvf.insideScvIdx()].density();
+        }
+        else if (onLeftBoundary_(scvf.ipGlobal()))
+        {
+            values[scvf.directionIndex()] = 1.0*scvf.directionSign();
         }
 
         return values;
@@ -291,9 +290,9 @@ public:
     }
 
     //! set the pointer to the projector class
-    void setMortarProjection(CellSolutionVector p)
+    void setMortarProjection(SolutionVector p)
     {
-        mortarProjection_ = p;
+        mortarProjection_ = p[FVGridGeometry::cellCenterIdx()];
     }
 
     //! Set whether or not the homogeneous system is solved
@@ -307,16 +306,6 @@ public:
     {
         return (isOnNegativeMortarSide_ && onLowerBoundary_(globalPos))
                || (!isOnNegativeMortarSide_ && onUpperBoundary_(globalPos));
-    }
-
-    //! Returns true if this domain is on the "negative" side of mortar
-    bool isOnNegativeMortarSide() const
-    { return isOnNegativeMortarSide_; }
-
-    //! Define the meaning of the mortar variable
-    void setMortarVariableType(OnePMortarVariableType mv)
-    {
-        mortarVariableType_ = mv;
     }
 
 private:
@@ -339,8 +328,9 @@ private:
 
     bool isOnNegativeMortarSide_;
     bool useHomogeneousSetup_;
-    OnePMortarVariableType mortarVariableType_;
+    bool useDirichletAtInterface_;
 };
+
 } // end namespace Dumux
 
 #endif // DUMUX_STOKES_SUBPROBLEM_HH

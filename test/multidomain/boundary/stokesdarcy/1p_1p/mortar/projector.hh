@@ -114,17 +114,16 @@ public:
      */
     MortarSolution projectSubDomainToMortar(const MortarSolution& x) const override
     {
-        const auto& M = mortarToSubDomainProjector_.massMatrix();
+        // const auto& M = mortarToSubDomainProjector_.massMatrix();
+        // auto up = x;
+        // UMFPackBackend solver;
+        // solver.solve(M, up, x);
+
         const auto& B = mortarToSubDomainProjector_.projectionMatrix();
-
-        auto up = x;
-        SSORCGBackend solver;
-        solver.solve(M, up, x);
-
         MortarSolution result;
         result.resize(B.M());
 
-        B.mtv(up, result);
+        B.mtv(x, result);
         return result;
     }
 

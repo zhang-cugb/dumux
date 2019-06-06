@@ -68,23 +68,23 @@ public:
         const auto glue2 = makeGlue(*solver2.gridGeometryPointer(), mortarGG);
 
         using namespace Dune::Functions::BasisFactory;
-        if (mv == OnePMortarVariableType::pressure)
-        {
-            // Currently we only support schemes with piecewise constant fluxes
-            const auto fluxBasis1 = makeBasis(solver1.gridGeometryPointer()->gridView(), lagrange<0>());
-            const auto fluxBasis2 = makeBasis(solver2.gridGeometryPointer()->gridView(), lagrange<0>());
-            const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
-
-            auto baseProjectors1 = makeProjectorPair(fluxBasis1, mortarBasis, glue1);
-            auto baseProjectors2 = makeProjectorPair(fluxBasis2, mortarBasis, glue2);
-
-            using P = MortarProjector<MortarSolution>;
-            auto p1 = std::make_shared<P>(std::move(baseProjectors1.second), std::move(baseProjectors1.first));
-            auto p2 = std::make_shared<P>(std::move(baseProjectors2.second), std::move(baseProjectors2.first));
-            return std::make_pair(p1, p2);
-        }
-        else
-        {
+        // if (mv == OnePMortarVariableType::pressure)
+        // {
+            // // Currently we only support schemes with piecewise constant fluxes
+            // const auto fluxBasis1 = makeBasis(solver1.gridGeometryPointer()->gridView(), lagrange<0>());
+            // const auto fluxBasis2 = makeBasis(solver2.gridGeometryPointer()->gridView(), lagrange<0>());
+            // const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
+            //
+            // auto baseProjectors1 = makeProjectorPair(fluxBasis1, mortarBasis, glue1);
+            // auto baseProjectors2 = makeProjectorPair(fluxBasis2, mortarBasis, glue2);
+            //
+            // using P = MortarProjector<MortarSolution>;
+            // auto p1 = std::make_shared<P>(std::move(baseProjectors1.second), std::move(baseProjectors1.first));
+            // auto p2 = std::make_shared<P>(std::move(baseProjectors2.second), std::move(baseProjectors2.first));
+            // return std::make_pair(p1, p2);
+        // }
+        // else
+        // {
             const auto sd1Basis = getFunctionSpaceBasis(*solver1.gridGeometryPointer());
             const auto sd2Basis = getFunctionSpaceBasis(*solver2.gridGeometryPointer());
             const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
@@ -99,7 +99,7 @@ public:
             auto p1 = std::make_shared<P>(std::move(toSubDomain1));
             auto p2 = std::make_shared<P>(std::move(toSubDomain2));
             return std::make_pair(p1, p2);
-        }
+        // }
     }
 };
 

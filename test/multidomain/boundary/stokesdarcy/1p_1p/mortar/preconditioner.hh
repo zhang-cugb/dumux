@@ -78,6 +78,7 @@ public:
     virtual void apply (MortarSolutionVector& r, const MortarSolutionVector& x)
     {
         r = x;
+        //
         // const auto mvt = variableType_ == OnePMortarVariableType::pressure ?
         //                                   OnePMortarVariableType::flux :
         //                                   OnePMortarVariableType::pressure;
@@ -85,8 +86,17 @@ public:
         // solver2_->problemPointer()->setMortarVariableType(mvt);
         //
         // // project mortar pressure into sub-domains
-        // const auto p1 = projector1_->projectMortarToSubDomain(x);
-        // const auto p2 = projector2_->projectMortarToSubDomain(x);
+        // auto p1 = projector1_->projectMortarToSubDomain(x);
+        // auto p2 = projector2_->projectMortarToSubDomain(x);
+        //
+        // const auto isNegative1 = solver1_->problemPointer()->isOnNegativeMortarSide();
+        // const auto isNegative2 = solver2_->problemPointer()->isOnNegativeMortarSide();
+        //
+        // if (mvt == OnePMortarVariableType::pressure)
+        // {
+        //     if (isNegative1) p1 *= -1.0;
+        //     if (isNegative2) p2 *= -1.0;
+        // }
         //
         // solver1_->problemPointer()->setMortarProjection(p1);
         // solver2_->problemPointer()->setMortarProjection(p2);
@@ -100,15 +110,18 @@ public:
         // // compute fluxes in sub-domains
         // if (mvt == OnePMortarVariableType::pressure)
         // {
-        //     const auto flux1 = R1::template recoverNormalFlux<MortarSolutionVector>(*solver1_->gridGeometryPointer(),
-        //                                                                             *solver1_->gridVariablesPointer(),
-        //                                                                             *solver1_->solutionPointer(),
-        //                                                                             coupledScvfMap1_);
+        //     auto flux1 = R1::template recoverNormalFlux<MortarSolutionVector>(*solver1_->gridGeometryPointer(),
+        //                                                                       *solver1_->gridVariablesPointer(),
+        //                                                                       *solver1_->solutionPointer(),
+        //                                                                       coupledScvfMap1_);
         //
-        //     const auto flux2 = R2::template recoverNormalFlux<MortarSolutionVector>(*solver2_->gridGeometryPointer(),
-        //                                                                             *solver2_->gridVariablesPointer(),
-        //                                                                             *solver2_->solutionPointer(),
-        //                                                                             coupledScvfMap2_);
+        //     auto flux2 = R2::template recoverNormalFlux<MortarSolutionVector>(*solver2_->gridGeometryPointer(),
+        //                                                                       *solver2_->gridVariablesPointer(),
+        //                                                                       *solver2_->solutionPointer(),
+        //                                                                       coupledScvfMap2_);
+        //
+        //     // if (isNegative1) flux1 *= -1.0;
+        //     // if (isNegative2) flux2 *= -1.0;
         //
         //     r = projector1_->projectSubDomainToMortar(flux1);
         //     r += projector2_->projectSubDomainToMortar(flux2);
@@ -126,7 +139,7 @@ public:
         //                                                                               coupledScvfMap2_);
         //
         //     r = projector1_->projectSubDomainToMortar(pressure1);
-        //     r -= projector2_->projectSubDomainToMortar(pressure2);
+        //     r += projector2_->projectSubDomainToMortar(pressure2);
         // }
         // else
         //     DUNE_THROW(Dune::InvalidStateException, "Unkown mortar variable type");

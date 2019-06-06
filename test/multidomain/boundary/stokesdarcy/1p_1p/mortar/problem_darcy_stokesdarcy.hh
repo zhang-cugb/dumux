@@ -38,8 +38,6 @@
 #include <dumux/material/components/simpleh2o.hh>
 #include <dumux/material/fluidsystems/1pliquid.hh>
 
-#include "mortarvariabletype.hh"
-
 namespace Dumux {
 template <class TypeTag>
 class DarcySubProblem;
@@ -120,9 +118,11 @@ public:
     , eps_(1e-7)
     , isOnNegativeMortarSide_(getParamFromGroup<bool>(paramGroup, "Problem.IsOnNegativeMortarSide"))
     {
-        const auto mv = getParamFromGroup<std::string>("Mortar", "VariableType");
-        mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure
-                                               : OnePMortarVariableType::flux;
+        const auto mortarVariable = getParamFromGroup<std::string>("Mortar", "VariableType");
+        if (mortarVariable == "Pressure")
+            useDirichletAtInterface_ = true;
+        else if (mortarVariable == "Flux")
+            useDirichletAtInterface_ = false;
 
         useDirichletLeftBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletLeft");
         useDirichletRightBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletRight");
@@ -175,10 +175,8 @@ public:
         if (isOnMortarInterface(scv.dofPosition()))
         {
             BoundaryTypes values;
-            if (mortarVariableType_ == OnePMortarVariableType::pressure)
-                values.setAllDirichlet();
-            else
-                values.setAllNeumann();
+            if (useDirichletAtInterface_) values.setAllDirichlet();
+            else values.setAllNeumann();
             return values;
         }
         else
@@ -198,10 +196,8 @@ public:
 
         if (isOnMortarInterface(scvf.ipGlobal()))
         {
-            if (mortarVariableType_ == OnePMortarVariableType::pressure)
-                values.setAllDirichlet();
-            else
-                values.setAllNeumann();
+            if (useDirichletAtInterface_) values.setAllDirichlet();
+            else values.setAllNeumann();
             return values;
         }
         else
@@ -217,7 +213,7 @@ public:
       */
     BoundaryTypes boundaryTypesAtPos(const GlobalPosition& globalPos) const
     {
-        BoundaryTypes values; values.setAllDirichlet(); return values;
+        BoundaryTypes values;
 
         if (onLeftBoundary_(globalPos))
         {
@@ -247,28 +243,10 @@ public:
     }
 
     /*!
-     * \brief Evaluate the exact solution at a given position.
-     */
-    NumEqVector exact(const GlobalPosition& globalPos) const
-    {
-        return NumEqVector( globalPos[1] );
-    }
-
-    /*!
-     * \brief Evaluate the exact normal velocity at a given position.
-     */
-    GlobalPosition exactFlux(const GlobalPosition& globalPos) const
-    {
-        return GlobalPosition( {0.0, -1.0} );
-    }
-
-    /*!
      * \brief Evaluate the source term at a given position.
      */
     NumEqVector sourceAtPos(const GlobalPosition& globalPos) const
-    {
-        return NumEqVector( 0.0 );
-    }
+    { return NumEqVector( 0.0 ); }
 
     /*!
      * \brief Evaluates the boundary conditions for a Dirichlet sub-control volume face
@@ -301,17 +279,14 @@ public:
     {
         if (!useHomogeneousSetup_)
         {
-            return exact(globalPos);
-            const auto x = globalPos[0];
-            const auto factor = 1.0 + std::sin(4*M_PI*x);
             if (onBottomBoundary_(globalPos))
-                return PrimaryVariables( factor*bottomBCValue_ );
+                return PrimaryVariables( bottomBCValue_ );
             else if (onTopBoundary_(globalPos))
-                return PrimaryVariables( factor*topBCValue_ );
+                return PrimaryVariables( topBCValue_ );
             else if (onLeftBoundary_(globalPos))
-                return PrimaryVariables( factor*leftBCValue_ );
+                return PrimaryVariables( leftBCValue_ );
             else
-                return PrimaryVariables( factor*rightBCValue_ );
+                return PrimaryVariables( rightBCValue_ );
         }
         else
             return PrimaryVariables(0.0);
@@ -389,16 +364,6 @@ public:
                || (!isOnNegativeMortarSide_ && onTopBoundary_(globalPos));
     }
 
-    //! Returns true if this domain is on the "negative" side of mortar
-    bool isOnNegativeMortarSide() const
-    { return isOnNegativeMortarSide_; }
-
-    //! Define the meaning of the mortar variable
-    void setMortarVariableType(OnePMortarVariableType mv)
-    {
-        mortarVariableType_ = mv;
-    }
-
 private:
     //! Returns true if position is on lower domain boundary
     bool onBottomBoundary_(const GlobalPosition &globalPos) const
@@ -422,7 +387,7 @@ private:
 
     bool isOnNegativeMortarSide_;
     bool useHomogeneousSetup_;
-    OnePMortarVariableType mortarVariableType_;
+    bool useDirichletAtInterface_;
 
     bool useDirichletLeftBoundary_;   Scalar leftBCValue_;
     bool useDirichletRightBoundary_;  Scalar rightBCValue_;

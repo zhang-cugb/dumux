@@ -95,6 +95,9 @@ class NavierStokesFluxVariablesImpl<TypeTag, DiscretizationMethod::staggered>
 
 public:
 
+    // HACK!!! TODO: WHat to do here?
+    static constexpr int numPhases = 1;
+
     using HeatConductionType = GetPropType<TypeTag, Properties::HeatConductionType>;
 
     /*!

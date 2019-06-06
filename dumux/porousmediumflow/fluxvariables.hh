@@ -63,13 +63,14 @@ class PorousMediumFluxVariables
     using ElementVolumeVariables = typename GetPropType<TypeTag, Properties::GridVolumeVariables>::LocalView;
     using ElementFluxVariablesCache = typename GetPropType<TypeTag, Properties::GridFluxVariablesCache>::LocalView;
 
+public:
+
     enum
     {
         numPhases = ModelTraits::numFluidPhases(),
         numComponents = ModelTraits::numFluidComponents()
     };
 
-public:
     using AdvectionType = GetPropType<TypeTag, Properties::AdvectionType>;
     using MolecularDiffusionType = GetPropType<TypeTag, Properties::MolecularDiffusionType>;
     using HeatConductionType = GetPropType<TypeTag, Properties::HeatConductionType>;

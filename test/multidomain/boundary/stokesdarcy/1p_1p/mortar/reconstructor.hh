@@ -306,9 +306,9 @@ public:
             fluxVars.init(problem, sdElement, fvGeometry, elemVolVars, scvf, elemFluxVarsCache);
 
             auto up = [] (const auto& vv) { return vv.mobility(); };
-            cellFluxes[sdElemIdx] = -1.0*fluxVars.advectiveFlux(0, up)
-                                        /insideVolVars.extrusionFactor()
-                                        /scvf.area();
+            cellFluxes[sdElemIdx] = fluxVars.advectiveFlux(0, up)
+                                    /insideVolVars.extrusionFactor()
+                                    /scvf.area();
         }
 
         return cellFluxes;

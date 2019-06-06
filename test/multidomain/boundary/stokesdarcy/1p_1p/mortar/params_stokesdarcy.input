@@ -12,30 +12,11 @@ SolverType = Darcy
 DiscretizationScheme = Tpfa
 Grid.LowerLeft = 0 0
 Grid.UpperRight = 1 1
-Grid.Cells = 60 80
+Grid.Cells = 60 40
 Problem.Name = darcy1
 Problem.IsOnNegativeMortarSide = false
 Problem.UseDirichletLeft = false
 Problem.UseDirichletRight = false
-Problem.UseDirichletTop = false
-Problem.UseDirichletBottom = true
-Problem.BCValueLeft = 0
-Problem.BCValueRight = 0
-Problem.BCValueTop = 0
-Problem.BCValueBottom = 1
-Problem.SourceValue = 0
-
-[Domain2]
-SolverType = Darcy
-DiscretizationScheme = Tpfa
-Grid.LowerLeft = 0 1
-Grid.UpperRight = 1 2
-Grid.Cells = 80 80
-Problem.Name = stokes
-Problem.IsOnNegativeMortarSide = true
-Problem.PressureDifference = 1
-Problem.UseDirichletLeft = false
-Problem.UseDirichletRight = true
 Problem.UseDirichletTop = false
 Problem.UseDirichletBottom = false
 Problem.BCValueLeft = 0
@@ -44,27 +25,30 @@ Problem.BCValueTop = 0
 Problem.BCValueBottom = 0
 Problem.SourceValue = 0
 
+[Domain2]
+SolverType = Stokes
+DiscretizationScheme = Staggered
+Grid.LowerLeft = 0 1
+Grid.UpperRight = 1 2
+Grid.Cells = 40 40
+Problem.Name = stokes
+Problem.IsOnNegativeMortarSide = true
+Problem.PressureDifference = 1
+
 [Mortar]
 Grid.LowerLeft = 0 1
 Grid.UpperRight = 1 1
-Grid.Cells = 70
-VariableType = Flux
+Grid.Cells = 25
+VariableType = Pressure
 
 [InterfaceSolver]
 Verbosity = 2
 ResidualReduction = 1e-6
 MaxIterations = 2000
-LinearSolverType = GMRes
 
 [Vtk]
 OutputName = mortarcoupling
 AddVelocity = 1
-
-[L2Error]
-IntegrationOrder = 1
-
-[Assembly]
-NumericDifference.BaseEpsilon = 1
 
 [0.Component]
 LiquidDensity = 1

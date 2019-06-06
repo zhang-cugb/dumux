@@ -139,7 +139,7 @@ public:
         auto rhs = up;
         projMat_.mv(u, rhs);
 
-        SSORCGBackend solver;
+        UMFPackBackend solver;
         solver.setResidualReduction(params.residualReduction);
         solver.setMaxIter(params.maxIterations);
         solver.solve(massMat_, up, rhs);

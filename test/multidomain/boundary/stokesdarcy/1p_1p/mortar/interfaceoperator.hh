@@ -96,18 +96,21 @@ public:
         }
         else if (variableType_ == OnePMortarVariableType::flux)
         {
-            const auto pressure1 = R1::template recoverSolution<MortarSolutionVector>(*solver1_->gridGeometryPointer(),
-                                                                                      *solver1_->gridVariablesPointer(),
-                                                                                      *solver1_->solutionPointer(),
-                                                                                      coupledScvfMap1_);
+            auto pressure1 = R1::template recoverSolution<MortarSolutionVector>(*solver1_->gridGeometryPointer(),
+                                                                                *solver1_->gridVariablesPointer(),
+                                                                                *solver1_->solutionPointer(),
+                                                                                coupledScvfMap1_);
 
-            const auto pressure2 = R2::template recoverSolution<MortarSolutionVector>(*solver2_->gridGeometryPointer(),
-                                                                                      *solver2_->gridVariablesPointer(),
-                                                                                      *solver2_->solutionPointer(),
-                                                                                      coupledScvfMap2_);
+            auto pressure2 = R2::template recoverSolution<MortarSolutionVector>(*solver2_->gridGeometryPointer(),
+                                                                                *solver2_->gridVariablesPointer(),
+                                                                                *solver2_->solutionPointer(),
+                                                                                coupledScvfMap2_);
+
+            if (solver1_->problemPointer()->isOnNegativeMortarSide()) pressure1 *= -1.0;
+            if (solver2_->problemPointer()->isOnNegativeMortarSide()) pressure2 *= -1.0;
 
             r = projector1_->projectSubDomainToMortar(pressure1);
-            r -= projector2_->projectSubDomainToMortar(pressure2);
+            r += projector2_->projectSubDomainToMortar(pressure2);
         }
         else
             DUNE_THROW(Dune::InvalidStateException, "Unkown mortar variable type");
