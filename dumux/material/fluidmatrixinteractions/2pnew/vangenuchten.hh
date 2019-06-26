@@ -37,7 +37,6 @@ namespace FluidMatrix {
  * \ingroup Fluidmatrixinteractions
  * \brief Implementation of the van Genuchten capillary pressure <->
  *        saturation relation, and relative permeability.
- *        This namespace bundles the "raw" curves.
  */
 class VanGenuchten
 {
