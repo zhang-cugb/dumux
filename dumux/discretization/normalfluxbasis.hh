@@ -66,17 +66,16 @@ getVelocityFunctionSpaceBasis(const GridGeometry& gridGeometry)
  */
 template<class FluxVariables, class GridGeometry, class GridVariables, class SolutionVector,
          std::enable_if_t<GridGeometry::discMethod == DiscretizationMethod::cctpfa, int> = 0>
-std::array< Dune::BlockVector< Dune::FieldVector<typename SolutionVector::field_type, GridGeometry::GridView::dimension> >,
+std::array< Dune::BlockVector< Dune::FieldVector<typename SolutionVector::field_type, 1> >,
             FluxVariables::numPhases >
 getVelocityCoefficientVector(const typename VelocityFunctionSpaceBasisTraits<GridGeometry>::GlobalBasis& velocityBasis,
                              const GridGeometry& gridGeometry,
                              const GridVariables& gridVariables,
                              const SolutionVector& x)
 {
-    static constexpr int dim = GridGeometry::GridView::dimension;
     static constexpr int numPhases = FluxVariables::numPhases;
 
-    using FluxRange = Dune::FieldVector<typename SolutionVector::field_type, dim>;
+    using FluxRange = Dune::FieldVector<typename SolutionVector::field_type, 1>;
     using CoefficientVector = Dune::BlockVector<FluxRange>;
     using ResultType = std::array< CoefficientVector, numPhases >;
 
@@ -131,11 +130,14 @@ getVelocityCoefficientVector(const typename VelocityFunctionSpaceBasisTraits<Gri
                         if (numPhases > 1)
                             DUNE_THROW(Dune::InvalidStateException, "Don't know how to interpret Neumann fluxes");
 
+                        // std::cout << "NEUMFLUX VS EXACT " << neumannFluxes[0] << " - " << problem.exactFlux(scvf.ipGlobal()) << std::endl;
                         for (unsigned int pIdx = 0; pIdx < numPhases; ++pIdx)
-                            coefficients[pIdx][idx] = neumannFluxes[0];
+                            coefficients[pIdx][idx] = neumannFluxes[0]/insideVolVars.density(pIdx);
                     }
                     else if (bcTypes.hasOnlyDirichlet())
                     {
+                        // std::cout << "diri flux VS EXACT " << computeFlux(0) << " - " << problem.exactFlux(scvf.ipGlobal()) << std::endl;
+
                         for (unsigned int pIdx = 0; pIdx < numPhases; ++pIdx)
                             coefficients[pIdx][idx] = computeFlux(pIdx);
                     }
@@ -144,6 +146,8 @@ getVelocityCoefficientVector(const typename VelocityFunctionSpaceBasisTraits<Gri
                 }
                 else
                 {
+                    // std::cout << "flux VS EXACT " << computeFlux(0) << " - " << problem.exactFlux(scvf.ipGlobal()) << std::endl;
+
                     const int sign = scvf.insideScvIdx() > scvf.outsideScvIdx() ? 1.0 : -1.0;
                     for (unsigned int pIdx = 0; pIdx < numPhases; ++pIdx)
                         coefficients[pIdx][idx] = sign*computeFlux(pIdx);

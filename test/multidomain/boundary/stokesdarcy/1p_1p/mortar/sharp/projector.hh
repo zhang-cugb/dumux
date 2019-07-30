@@ -71,16 +71,10 @@ public:
     /*!
      * \brief TODO doc me.
      */
-    template<class Projector>
-    SharpMortarProjector(const Projector& toSubDomain1,
-                         const Projector& toSubDomain2)
+    template<class ProjectionMatrix>
+    SharpMortarProjector(const ProjectionMatrix& M1, const ProjectionMatrix& B1,
+                         const ProjectionMatrix& M2, const ProjectionMatrix& B2)
     {
-        const auto& M1 = toSubDomain1.massMatrix();
-        const auto& M2 = toSubDomain2.massMatrix();
-
-        const auto& B1 = toSubDomain1.projectionMatrix();
-        const auto& B2 = toSubDomain2.projectionMatrix();
-
         // create identity matrices
         SubMatrix I1, I2;
 

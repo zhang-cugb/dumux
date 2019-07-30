@@ -75,10 +75,10 @@ public:
         const auto glue1 = makeGlue(gg1, *mortarGG);
         const auto glue2 = makeGlue(gg2, *mortarGG);
 
-        const auto projector1 = makeProjectorPair(getFunctionSpaceBasis(gg1), getFunctionSpaceBasis(*mortarGG), glue1).second;
-        const auto projector2 = makeProjectorPair(getFunctionSpaceBasis(gg2), getFunctionSpaceBasis(*mortarGG), glue2).second;
+        const auto matrices1 = makeProjectionMatricesPair(getFunctionSpaceBasis(gg1), getFunctionSpaceBasis(*mortarGG), glue1).second;
+        const auto matrices2 = makeProjectionMatricesPair(getFunctionSpaceBasis(gg2), getFunctionSpaceBasis(*mortarGG), glue2).second;
 
-        projector_ = std::make_shared<Projector>(projector1, projector2);
+        projector_ = std::make_shared<Projector>(matrices1.first, matrices1.second, matrices2.first, matrices2.second);
     }
 
     //! apply operator to x:  \f$ y = A(x) \f$
@@ -143,6 +143,17 @@ public:
     //! Category of the solver (see SolverCategory::Category)
     virtual Dune::SolverCategory::Category category() const
     { return Dune::SolverCategory::sequential; }
+
+    //! Return the coupled scvf map of sub-domain 1
+    const CoupledScvfMap1& coupledScvfMap1() const
+    { return coupledScvfMap1_; }
+
+    //! Return the coupled scvf map of sub-domain 2
+    const CoupledScvfMap2& coupledScvfMap2() const
+    { return coupledScvfMap2_; }
+
+    const Projector& projector() const
+    { return *projector_; }
 
 private:
     std::shared_ptr<Solver1> solver1_;

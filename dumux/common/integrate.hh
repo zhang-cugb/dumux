@@ -249,6 +249,105 @@ auto integrateL2Error(const GridView& gv,
     using std::sqrt;
     return sqrt(l2norm);
 }
+
+/*!
+ * \brief Integrate a function over a grid view
+ * \param gv the grid view
+ * \param f the first function
+ * \param g the second function
+ * \param order the order of the quadrature rule
+ * \note overload for a Dune::Funtions::GridFunction
+ * \note dune functions currently doesn't support composing two functions
+ */
+template<class GridView, class F, class G,
+         typename std::enable_if_t<Impl::hasLocalFunction<F>(), int> = 0>
+auto integrateFaceFluxError(const GridView& gv,
+                            const F& f,
+                            const G& g,
+                            std::size_t order)
+{
+    auto fLocal = localFunction(f);
+    auto gLocal = localFunction(g);
+
+    using Element = typename GridView::template Codim<0>::Entity;
+    using LocalPosition = typename Element::Geometry::LocalCoordinate;
+    using Scalar = typename Impl::FieldType< std::decay_t<decltype(fLocal(std::declval<LocalPosition>()))> >;
+
+    Scalar norm(0.0);
+    Scalar ifNorm(0.0);
+    Scalar stripNorm(0.0);
+    Scalar stripIFNorm(0.0);
+    for (const auto& element : elements(gv))
+    {
+        fLocal.bind(element);
+        gLocal.bind(element);
+
+        bool isInterfaceElement = false;
+        if (element.hasBoundaryIntersections())
+        {
+            const auto y = element.geometry().center()[1];
+            for (const auto& is : intersections(gv, element))
+                if (is.boundary())
+                {
+                    if (y < 1.0 && is.centerUnitOuterNormal()[1] > 0.9)
+                        isInterfaceElement = true;
+                    else if (y > 1.0 && is.centerUnitOuterNormal()[1] < -0.9)
+                        isInterfaceElement = true;
+                }
+        }
+
+        Scalar localNorm = 0.0;
+        Scalar localIFNorm = 0.0;
+        for (const auto& is : intersections(gv, element))
+        {
+            const auto isGeometry = is.geometry();
+            const auto normal = is.centerUnitOuterNormal();
+            const auto gCenter = gLocal(isGeometry.center())*normal;
+
+            Scalar errorSq = 0.0;
+            const auto& quad = Dune::QuadratureRules<Scalar, GridView::dimension-1>::rule(isGeometry.type(), order);
+            for (auto&& qp : quad)
+            {
+                const auto localPos = is.geometryInInside().global(qp.position());
+                const auto error = fLocal(localPos)*normal - gCenter;
+                errorSq += (error*error)*qp.weight()*isGeometry.integrationElement(qp.position());
+            }
+
+            localNorm += errorSq/isGeometry.volume();
+
+            if (is.boundary())
+            {
+                const auto y = element.geometry().center()[1];
+                if (y < 1.0 && normal[1] > 0.9)
+                {
+                    ifNorm += errorSq;
+                    localIFNorm += errorSq/isGeometry.volume();
+                }
+                else if (y > 1.0 && normal[1] < -0.9)
+                {
+                    ifNorm += errorSq;
+                    localIFNorm += errorSq/isGeometry.volume();
+                }
+            }
+        }
+
+        if (isInterfaceElement)
+        {
+            stripNorm += localNorm*element.geometry().volume();
+            stripIFNorm += localIFNorm*element.geometry().volume();
+        }
+        norm += localNorm*element.geometry().volume();
+
+        gLocal.unbind();
+        fLocal.unbind();
+    }
+
+    std::cout << "Norm - strip norm - strip IF norm - if norm: " << std::sqrt(norm) << " - " << std::sqrt(stripNorm) << " - " << std::sqrt(stripIFNorm) << " - "<< std::sqrt(ifNorm) << std::endl;
+
+    using std::sqrt;
+    return sqrt(norm);
+}
+
 #endif
 
 } // end namespace Dumux

@@ -68,7 +68,6 @@ public:
         // project mortar pressure into sub-domains
         const auto p1 = projector1_->projectMortarToSubDomain(x);
         const auto p2 = projector2_->projectMortarToSubDomain(x);
-
         solver1_->problemPointer()->setMortarProjection(p1);
         solver2_->problemPointer()->setMortarProjection(p2);
 
@@ -130,6 +129,20 @@ public:
     //! Category of the solver (see SolverCategory::Category)
     virtual Dune::SolverCategory::Category category() const
     { return Dune::SolverCategory::sequential; }
+
+    //! Return the coupled scvf map of sub-domain 1
+    const CoupledScvfMap1& coupledScvfMap1() const
+    { return coupledScvfMap1_; }
+
+    //! Return the coupled scvf map of sub-domain 2
+    const CoupledScvfMap2& coupledScvfMap2() const
+    { return coupledScvfMap2_; }
+
+    const Projector& projector1() const
+    { return *projector1_; }
+
+    const Projector& projector2() const
+    { return *projector2_; }
 
 private:
     std::shared_ptr<Solver1> solver1_;

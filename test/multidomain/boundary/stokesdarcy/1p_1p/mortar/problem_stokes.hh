@@ -319,6 +319,9 @@ public:
         mortarVariableType_ = mv;
     }
 
+    CellSolutionVector mortarProjection() const
+    { return mortarProjection_; }
+
 private:
     bool onLeftBoundary_(const GlobalPosition &globalPos) const
     { return globalPos[0] < this->fvGridGeometry().bBoxMin()[0] + eps_; }

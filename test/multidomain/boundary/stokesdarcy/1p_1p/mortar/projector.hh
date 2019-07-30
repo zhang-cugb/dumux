@@ -99,8 +99,10 @@ public:
     /*!
      * \brief TODO doc me.
      */
-    TransposedMortarProjector(Projector&& toSubDomain)
-    : mortarToSubDomainProjector_(std::move(toSubDomain))
+    template<class Matrix>
+    TransposedMortarProjector(Matrix&& massMatrix, Matrix&& projMatrix)
+    : B_(projMatrix)
+    , mortarToSubDomainProjector_(std::move(massMatrix), std::move(projMatrix))
     {}
 
     /*!
@@ -114,20 +116,15 @@ public:
      */
     MortarSolution projectSubDomainToMortar(const MortarSolution& x) const override
     {
-        // const auto& M = mortarToSubDomainProjector_.massMatrix();
-        // auto up = x;
-        // UMFPackBackend solver;
-        // solver.solve(M, up, x);
-
-        const auto& B = mortarToSubDomainProjector_.projectionMatrix();
         MortarSolution result;
-        result.resize(B.M());
+        result.resize(B_.M());
 
-        B.mtv(x, result);
+        B_.mtv(x, result);
         return result;
     }
 
 private:
+    typename Projector::Matrix B_;
     Projector mortarToSubDomainProjector_;
 };
 

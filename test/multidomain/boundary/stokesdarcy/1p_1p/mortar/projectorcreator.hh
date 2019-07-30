@@ -24,6 +24,7 @@
 #ifndef DUMUX_MORTAR_PROJECTOR_CREATOR_HH
 #define DUMUX_MORTAR_PROJECTOR_CREATOR_HH
 
+#include <dune/common/promotiontraits.hh>
 #include <dune/functions/functionspacebases/lagrangebasis.hh>
 
 #include <dumux/discretization/functionspacebasis.hh>
@@ -70,7 +71,7 @@ public:
         using namespace Dune::Functions::BasisFactory;
         // if (mv == OnePMortarVariableType::pressure)
         // {
-            // // Currently we only support schemes with piecewise constant fluxes
+            // Currently we only support schemes with piecewise constant fluxes
             // const auto fluxBasis1 = makeBasis(solver1.gridGeometryPointer()->gridView(), lagrange<0>());
             // const auto fluxBasis2 = makeBasis(solver2.gridGeometryPointer()->gridView(), lagrange<0>());
             // const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
@@ -85,20 +86,19 @@ public:
         // }
         // else
         // {
+
             const auto sd1Basis = getFunctionSpaceBasis(*solver1.gridGeometryPointer());
             const auto sd2Basis = getFunctionSpaceBasis(*solver2.gridGeometryPointer());
             const auto& mortarBasis = getFunctionSpaceBasis(mortarGG);
 
-            auto baseProjectors1 = makeProjectorPair(sd1Basis, mortarBasis, glue1);
-            auto baseProjectors2 = makeProjectorPair(sd2Basis, mortarBasis, glue2);
-
-            auto toSubDomain1 = baseProjectors1.second;
-            auto toSubDomain2 = baseProjectors2.second;
+            auto baseProjectorMatrices1 = makeProjectionMatricesPair(sd1Basis, mortarBasis, glue1).second;
+            auto baseProjectorMatrices2 = makeProjectionMatricesPair(sd2Basis, mortarBasis, glue2).second;
 
             using P = TransposedMortarProjector<MortarSolution>;
-            auto p1 = std::make_shared<P>(std::move(toSubDomain1));
-            auto p2 = std::make_shared<P>(std::move(toSubDomain2));
+            auto p1 = std::make_shared<P>(std::move(baseProjectorMatrices1.first), std::move(baseProjectorMatrices1.second));
+            auto p2 = std::make_shared<P>(std::move(baseProjectorMatrices2.first), std::move(baseProjectorMatrices2.second));
             return std::make_pair(p1, p2);
+
         // }
     }
 };

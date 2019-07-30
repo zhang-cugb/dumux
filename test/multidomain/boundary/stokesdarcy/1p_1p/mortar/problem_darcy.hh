@@ -119,24 +119,12 @@ public:
     : ParentType(fvGridGeometry, spatialParams, paramGroup)
     , eps_(1e-7)
     , isOnNegativeMortarSide_(getParamFromGroup<bool>(paramGroup, "Problem.IsOnNegativeMortarSide"))
+    , useHomogeneousSetup_(false)
     {
         const auto mv = getParamFromGroup<std::string>("Mortar", "VariableType");
-        mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure
-                                               : OnePMortarVariableType::flux;
-
-        useDirichletLeftBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletLeft");
-        useDirichletRightBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletRight");
-        useDirichletBottomBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletBottom");
-        useDirichletTopBoundary_ = getParamFromGroup<bool>(paramGroup, "Problem.UseDirichletTop");
-
-        leftBCValue_ = getParamFromGroup<Scalar>(paramGroup, "Problem.BCValueLeft");
-        rightBCValue_ = getParamFromGroup<Scalar>(paramGroup, "Problem.BCValueRight");
-        bottomBCValue_ = getParamFromGroup<Scalar>(paramGroup, "Problem.BCValueBottom");
-        topBCValue_ = getParamFromGroup<Scalar>(paramGroup, "Problem.BCValueTop");
-
-        sourceValue_ = getParamFromGroup<Scalar>(paramGroup, "Problem.SourceValue");
-
+        mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure : OnePMortarVariableType::flux;
         problemName_  =  getParamFromGroup<std::string>(paramGroup, "Vtk.OutputName") + "_" + getParamFromGroup<std::string>(this->paramGroup(), "Problem.Name");
+        mortarProjection_.resize(fvGridGeometry->gridView().size(0), 0.0);
     }
 
     /*!
@@ -194,10 +182,9 @@ public:
       */
     BoundaryTypes boundaryTypes(const Element &element, const SubControlVolumeFace &scvf) const
     {
-        BoundaryTypes values;
-
         if (isOnMortarInterface(scvf.ipGlobal()))
         {
+            BoundaryTypes values;
             if (mortarVariableType_ == OnePMortarVariableType::pressure)
                 values.setAllDirichlet();
             else
@@ -217,32 +204,8 @@ public:
       */
     BoundaryTypes boundaryTypesAtPos(const GlobalPosition& globalPos) const
     {
-        BoundaryTypes values; values.setAllDirichlet(); return values;
-
-        if (onLeftBoundary_(globalPos))
-        {
-            if (useDirichletLeftBoundary_) values.setAllDirichlet();
-            else values.setAllNeumann();
-        }
-
-        if (onRightBoundary_(globalPos))
-        {
-            if (useDirichletRightBoundary_) values.setAllDirichlet();
-            else values.setAllNeumann();
-        }
-
-        if (onTopBoundary_(globalPos))
-        {
-            if (useDirichletTopBoundary_) values.setAllDirichlet();
-            else values.setAllNeumann();
-        }
-
-        if (onBottomBoundary_(globalPos))
-        {
-            if (useDirichletBottomBoundary_) values.setAllDirichlet();
-            else values.setAllNeumann();
-        }
-
+        BoundaryTypes values;
+        values.setAllDirichlet();
         return values;
     }
 
@@ -251,7 +214,13 @@ public:
      */
     NumEqVector exact(const GlobalPosition& globalPos) const
     {
-        return NumEqVector( globalPos[1] );
+        using std::sin;
+        using std::cos;
+
+        const auto x = globalPos[0];
+        const auto y = globalPos[1];
+
+        return NumEqVector( y*y*(1.0 - 1.0/3.0*y) + x*(1.0-x)*y*sin(2.0*M_PI*x) );
     }
 
     /*!
@@ -259,7 +228,15 @@ public:
      */
     GlobalPosition exactFlux(const GlobalPosition& globalPos) const
     {
-        return GlobalPosition( {0.0, -1.0} );
+        using std::sin;
+        using std::cos;
+
+        const auto x = globalPos[0];
+        const auto y = globalPos[1];
+        const auto& k = this->spatialParams().permeabilityAtPos(globalPos);
+
+        static const Scalar mu = getParam<Scalar>("0.Component.LiquidKinematicViscosity");
+        return GlobalPosition( {-1.0*k/mu*(y*((1.0-2.0*x)*sin(2.0*x*M_PI) - 2.0*M_PI*(x-1.0)*x*cos(2.0*M_PI*x))), -1.0*k/mu*(-(x-1.0)*x*sin(2*M_PI*x) - (y-2.0)*y)} );
     }
 
     /*!
@@ -267,7 +244,21 @@ public:
      */
     NumEqVector sourceAtPos(const GlobalPosition& globalPos) const
     {
-        return NumEqVector( 0.0 );
+        if (!useHomogeneousSetup_)
+        {
+            using std::sin;
+            using std::cos;
+
+            const auto x = globalPos[0];
+            const auto y = globalPos[1];
+            const auto& k = this->spatialParams().permeabilityAtPos(globalPos);
+
+            static const Scalar rho = getParam<Scalar>("0.Component.LiquidDensity");
+            static const Scalar mu = getParam<Scalar>("0.Component.LiquidKinematicViscosity");
+            return NumEqVector( 2.0*k*rho/mu*( (y - 2.0*M_PI*M_PI*(x-1.0)*x*y)*sin(2.0*M_PI*x) +2.0*M_PI*(2.0*x-1.0)*y*cos(2.0*M_PI*x) + y - 1.0) );
+        }
+
+        return NumEqVector(0.0);
     }
 
     /*!
@@ -300,19 +291,7 @@ public:
     PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
     {
         if (!useHomogeneousSetup_)
-        {
             return exact(globalPos);
-            const auto x = globalPos[0];
-            const auto factor = 1.0 + std::sin(4*M_PI*x);
-            if (onBottomBoundary_(globalPos))
-                return PrimaryVariables( factor*bottomBCValue_ );
-            else if (onTopBoundary_(globalPos))
-                return PrimaryVariables( factor*topBCValue_ );
-            else if (onLeftBoundary_(globalPos))
-                return PrimaryVariables( factor*leftBCValue_ );
-            else
-                return PrimaryVariables( factor*rightBCValue_ );
-        }
         else
             return PrimaryVariables(0.0);
     }
@@ -344,16 +323,7 @@ public:
             return isOnNegativeMortarSide_ ? NumEqVector(-1.0*flux) : NumEqVector(flux);
         }
         else
-        {
-            if (onLeftBoundary_(globalPos))
-                return NumEqVector(leftBCValue_);
-            else if (onRightBoundary_(globalPos))
-                return NumEqVector(rightBCValue_);
-            else if (onTopBoundary_(globalPos))
-                return NumEqVector(topBCValue_);
-            else
-                return NumEqVector(0.0);
-        }
+            DUNE_THROW(Dune::InvalidStateException, "This test should have no Neumann BCS");
     }
 
     // \}
@@ -399,6 +369,9 @@ public:
         mortarVariableType_ = mv;
     }
 
+    const SolutionVector& mortarProjection() const
+    { return mortarProjection_; }
+
 private:
     //! Returns true if position is on lower domain boundary
     bool onBottomBoundary_(const GlobalPosition &globalPos) const
@@ -423,14 +396,8 @@ private:
     bool isOnNegativeMortarSide_;
     bool useHomogeneousSetup_;
     OnePMortarVariableType mortarVariableType_;
-
-    bool useDirichletLeftBoundary_;   Scalar leftBCValue_;
-    bool useDirichletRightBoundary_;  Scalar rightBCValue_;
-    bool useDirichletBottomBoundary_; Scalar bottomBCValue_;
-    bool useDirichletTopBoundary_;    Scalar topBCValue_;
-
-    Scalar sourceValue_;
 };
+
 } // end namespace Dumux
 
 #endif //DUMUX_DARCY_SUBPROBLEM_HH

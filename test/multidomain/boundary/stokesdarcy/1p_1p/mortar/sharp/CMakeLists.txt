@@ -1,3 +1,4 @@
+set(CMAKE_BUILD_TYPE Release)
 dune_add_test(NAME test_md_mortar_sharp_darcy1p_stokes1p
               LABELS multidomain multidomain_boundary mortar stokesdarcy 1p stokes
               SOURCES main.cc

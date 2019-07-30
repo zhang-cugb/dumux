@@ -41,7 +41,6 @@ namespace Dumux {
 template<class TypeTag, class LinearSolver = Dumux::UMFPackBackend>
 class StokesSolver
 {
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
     using Problem = GetPropType<TypeTag, Properties::Problem>;
     using Assembler = StaggeredFVAssembler<TypeTag, DiffMethod::numeric>;
     using NewtonSolver = Dumux::NewtonSolver<Assembler, LinearSolver>;
@@ -56,6 +55,7 @@ public:
     using GridVariables = GridVars;
     using FVGridGeometry = GetPropType<TypeTag, Properties::FVGridGeometry>;
     using FluxVariables = GetPropType<TypeTag, Properties::FluxVariables>;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
 
     void init(const std::string& paramGroup)
     {
@@ -107,6 +107,10 @@ public:
         vtkWriter_->write(t);
     }
 
+    //! Return the output module
+    OutputModule& outputModule()
+    { return *vtkWriter_; }
+
     //! Return a pointer to the grid geometry
     std::shared_ptr<const FVGridGeometry> gridGeometryPointer() const
     { return fvGridGeometry_; }
@@ -141,7 +145,6 @@ private:
 template<class TypeTag, class LinearSolver = Dumux::UMFPackBackend>
 class DarcySolver
 {
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
     using Problem = GetPropType<TypeTag, Properties::Problem>;
     using SpatialParams = GetPropType<TypeTag, Properties::SpatialParams>;
     using Assembler = FVAssembler<TypeTag, DiffMethod::numeric>;
@@ -157,6 +160,7 @@ public:
     using GridVariables = GridVars;
     using FVGridGeometry = GetPropType<TypeTag, Properties::FVGridGeometry>;
     using FluxVariables = GetPropType<TypeTag, Properties::FluxVariables>;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
 
     void init(const std::string& paramGroup)
     {
@@ -190,6 +194,12 @@ public:
         IOFields::initOutputModule(*vtkWriter_);
         vtkWriter_->addVelocityOutput(std::make_shared<VelocityOutput>(*gridVariables_));
 
+        exact_.resize(fvGridGeometry_->gridView().size(0));
+        for (const auto& e : elements(fvGridGeometry_->gridView()))
+            exact_[fvGridGeometry_->elementMapper().index(e)] = problem_->exact(e.geometry().center());
+        vtkWriter_->addField(exact_, "p_exact");
+        vtkWriter_->addField(problem_->mortarProjection(), "flux_projected");
+
         // the assembler without time loop for stationary problem
         assembler_ = std::make_shared<Assembler>(problem_, fvGridGeometry_, gridVariables_);
 
@@ -209,6 +219,10 @@ public:
     {
         vtkWriter_->write(t);
     }
+
+    //! Return the output module
+    OutputModule& outputModule()
+    { return *vtkWriter_; }
 
     //! Return a pointer to the grid geometry
     std::shared_ptr<const FVGridGeometry> gridGeometryPointer() const
@@ -237,6 +251,7 @@ private:
     std::unique_ptr<OutputModule> vtkWriter_;
 
     std::shared_ptr<SolutionVector> x_;
+    SolutionVector exact_;
 };
 
 } // end namespace Dumux
