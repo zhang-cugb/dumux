@@ -15,7 +15,7 @@ if os.path.exists(errorFileSharp):
 
 cells1 = [10, 10]
 cells2 = [11, 10]
-cellsMortar = 4
+cellsMortar = 8
 numRefinements = 4
 
 hInverse = []
@@ -38,7 +38,7 @@ for refIdx in range(1, numRefinements+2):
                      "-Domain1.Problem.Name", "domain1",
                      "-Domain2.Grid.Cells", strCells2,
                      "-Domain2.Problem.Name", "domain2",
-                     "-Mortar.VariableType", "Pressure",
+                     "-Mortar.VariableType", "Flux",
                      "-Mortar.Grid.Cells", strCellsMortar])
 
     print("\n\nCalling sharp solver for refinement " + str(refIdx-1))

@@ -244,16 +244,29 @@ void solveMortar()
     const auto fieldInfoProjection1 = Dune::VTK::FieldInfo({"ifPressureProjected1", Dune::VTK::FieldInfo::Type::scalar, 1});
     const auto fieldInfoProjection2 = Dune::VTK::FieldInfo({"ifPressureProjected2", Dune::VTK::FieldInfo::Type::scalar, 1});
 
+    // project mortar projections from sub-domains back to mortar
+    const auto projectedFlux1 = solver1->problemPointer()->mortarProjection();
+    const auto projectedFlux2 = solver2->problemPointer()->mortarProjection();
+    auto fluxTuple = op.projector().projectSubDomainToMortar(projectedFlux1, projectedFlux2);
+    const auto gfBackProjectFlux1 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, fluxTuple[_0]);
+    const auto gfBackProjectFlux2 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, fluxTuple[_1]);
+    const auto fieldInfoBackProjection1 = Dune::VTK::FieldInfo({"fluxBackProjection1", Dune::VTK::FieldInfo::Type::scalar, 1});
+    const auto fieldInfoBackProjection2 = Dune::VTK::FieldInfo({"fluxBackProjection2", Dune::VTK::FieldInfo::Type::scalar, 1});
+
     if (MortarTraits::basisOrder == 0)
     {
         mortarWriter->addCellData(gfProject1, fieldInfoProjection1);
         mortarWriter->addCellData(gfProject2, fieldInfoProjection2);
+        mortarWriter->addCellData(gfBackProjectFlux1, fieldInfoBackProjection1);
+        mortarWriter->addCellData(gfBackProjectFlux2, fieldInfoBackProjection2);
         mortarWriter->addCellData(analyticFluxMortar, Dune::VTK::FieldInfo("flux_exact", Dune::VTK::FieldInfo::Type::scalar, 1));
     }
     else
     {
         mortarWriter->addVertexData(gfProject1, fieldInfoProjection1);
         mortarWriter->addVertexData(gfProject2, fieldInfoProjection2);
+        mortarWriter->addVertexData(gfBackProjectFlux1, fieldInfoBackProjection1);
+        mortarWriter->addVertexData(gfBackProjectFlux2, fieldInfoBackProjection2);
         mortarWriter->addVertexData(analyticFluxMortar, Dune::VTK::FieldInfo("flux_exact", Dune::VTK::FieldInfo::Type::scalar, 1));
     }
 
