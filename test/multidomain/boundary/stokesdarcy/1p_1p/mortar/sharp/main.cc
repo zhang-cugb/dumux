@@ -245,11 +245,17 @@ void solveMortar()
     const auto fieldInfoProjection2 = Dune::VTK::FieldInfo({"ifPressureProjected2", Dune::VTK::FieldInfo::Type::scalar, 1});
 
     // project mortar projections from sub-domains back to mortar
-    const auto projectedFlux1 = solver1->problemPointer()->mortarProjection();
-    const auto projectedFlux2 = solver2->problemPointer()->mortarProjection();
-    auto fluxTuple = op.projector().projectSubDomainToMortar(projectedFlux1, projectedFlux2);
-    const auto gfBackProjectFlux1 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, fluxTuple[_0]);
-    const auto gfBackProjectFlux2 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, fluxTuple[_1]);
+    const auto projector1 = makeProjectorPair(basis1, *feBasis, glue1).first;
+    const auto projector2 = makeProjectorPair(basis2, *feBasis, glue2).first;
+    const auto& projectedFlux1 = solver1->problemPointer()->mortarProjection();
+    const auto& projectedFlux2 = solver2->problemPointer()->mortarProjection();
+
+    auto params = projector1.defaultParams();
+    params.residualReduction = 1e-16;
+    const auto backProjection1 = projector1.project(projectedFlux1, params);
+    const auto backProjection2 = projector2.project(projectedFlux2, params);
+    const auto gfBackProjectFlux1 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, backProjection1);
+    const auto gfBackProjectFlux2 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, backProjection2);
     const auto fieldInfoBackProjection1 = Dune::VTK::FieldInfo({"fluxBackProjection1", Dune::VTK::FieldInfo::Type::scalar, 1});
     const auto fieldInfoBackProjection2 = Dune::VTK::FieldInfo({"fluxBackProjection2", Dune::VTK::FieldInfo::Type::scalar, 1});
 

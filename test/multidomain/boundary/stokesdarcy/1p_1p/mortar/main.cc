@@ -235,16 +235,39 @@ void solveMortar(Dumux::OnePMortarVariableType mv)
     const auto fieldInfoProjection1 = Dune::VTK::FieldInfo({"ifPressureProjected1", Dune::VTK::FieldInfo::Type::scalar, 1});
     const auto fieldInfoProjection2 = Dune::VTK::FieldInfo({"ifPressureProjected2", Dune::VTK::FieldInfo::Type::scalar, 1});
 
+    // project mortar projections from sub-domains back to mortar
+    const auto glue1 = makeGlue(*solver1->gridGeometryPointer(), *mortarGridGeometry);
+    const auto glue2 = makeGlue(*solver2->gridGeometryPointer(), *mortarGridGeometry);
+    const auto& basis1 = getFunctionSpaceBasis(*solver1->gridGeometryPointer());
+    const auto& basis2 = getFunctionSpaceBasis(*solver2->gridGeometryPointer());
+    const auto backProjector1 = makeProjectorPair(basis1, *feBasis, glue1).first;
+    const auto backProjector2 = makeProjectorPair(basis2, *feBasis, glue2).first;
+    const auto& projectedFlux1 = solver1->problemPointer()->mortarProjection();
+    const auto& projectedFlux2 = solver2->problemPointer()->mortarProjection();
+
+    auto params = backProjector1.defaultParams();
+    params.residualReduction = 1e-16;
+    const auto backProjection1 = backProjector1.project(projectedFlux1, params);
+    const auto backProjection2 = backProjector2.project(projectedFlux2, params);
+    const auto gfBackProjectFlux1 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, backProjection1);
+    const auto gfBackProjectFlux2 = Dune::Functions::template makeDiscreteGlobalBasisFunction<typename MortarSolution::block_type>(*feBasis, backProjection2);
+    const auto fieldInfoBackProjection1 = Dune::VTK::FieldInfo({"fluxBackProjection1", Dune::VTK::FieldInfo::Type::scalar, 1});
+    const auto fieldInfoBackProjection2 = Dune::VTK::FieldInfo({"fluxBackProjection2", Dune::VTK::FieldInfo::Type::scalar, 1});
+
     if (MortarTraits::basisOrder == 0)
     {
         mortarWriter->addCellData(gfProject1, fieldInfoProjection1);
         mortarWriter->addCellData(gfProject2, fieldInfoProjection2);
+        mortarWriter->addCellData(gfBackProjectFlux1, fieldInfoBackProjection1);
+        mortarWriter->addCellData(gfBackProjectFlux2, fieldInfoBackProjection2);
         mortarWriter->addCellData(analyticFluxMortar, Dune::VTK::FieldInfo("flux_exact", Dune::VTK::FieldInfo::Type::scalar, 1));
     }
     else
     {
         mortarWriter->addVertexData(gfProject1, fieldInfoProjection1);
         mortarWriter->addVertexData(gfProject2, fieldInfoProjection2);
+        mortarWriter->addVertexData(gfBackProjectFlux1, fieldInfoBackProjection1);
+        mortarWriter->addVertexData(gfBackProjectFlux2, fieldInfoBackProjection2);
         mortarWriter->addVertexData(analyticFluxMortar, Dune::VTK::FieldInfo("flux_exact", Dune::VTK::FieldInfo::Type::scalar, 1));
     }
 
@@ -256,9 +279,6 @@ void solveMortar(Dumux::OnePMortarVariableType mv)
     // compute L2 error
     using namespace Dune::Functions;
     using BlockType = typename MortarSolution::block_type;
-
-    const auto& basis1 = getFunctionSpaceBasis(*solver1->gridGeometryPointer());
-    const auto& basis2 = getFunctionSpaceBasis(*solver2->gridGeometryPointer());
 
     auto gf1 = makeDiscreteGlobalBasisFunction<BlockType>(basis1, *solver1->solutionPointer());
     auto gf2 = makeDiscreteGlobalBasisFunction<BlockType>(basis2, *solver2->solutionPointer());
