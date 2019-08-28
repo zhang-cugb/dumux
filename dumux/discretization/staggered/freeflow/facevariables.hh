@@ -69,6 +69,14 @@ class StaggeredFaceVariables
 public:
 
     /*!
+     * \brief Returns the vector of primary variables.
+     */
+    const FacePrimaryVariables priVars() const
+    {
+        return FacePrimaryVariables(inAxisVelocities_.self);
+    }
+
+    /*!
     * \brief Partial update of the face variables. Only the face itself is considered.
     *
     * \param priVars The face-specific primary variales
