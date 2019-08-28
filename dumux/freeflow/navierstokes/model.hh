@@ -104,6 +104,10 @@ struct NavierStokesModelTraits
     static constexpr auto turbulenceModel()
     { return TurbulenceModel::none; }
 
+    //! returns that this is a free flow model
+    static constexpr bool isFreeFlowModel()
+    { return true; }
+
     //! the indices
     using Indices = NavierStokesIndices<dim()>;
 };
