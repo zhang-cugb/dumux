@@ -39,8 +39,24 @@
 #include <dumux/assembly/diffmethod.hh>
 #include <dumux/assembly/fvlocalassemblerbase.hh>
 #include <dumux/discretization/staggered/elementsolution.hh>
+#include <dumux/common/typetraits/isvalid.hh>
 
 namespace Dumux {
+
+#ifndef DOXYGEN
+namespace Detail {
+// helper struct detecting if the Model traits struct features a isFreeFlowModel() function
+// for g++ > 5.3, this can be replaced by a lambda
+struct isFreeFlowModel
+{
+    template<class ModelTraits>
+    auto operator()(ModelTraits&& mt)
+    -> decltype(mt.isFreeFlowModel())
+    {}
+};
+} // end namespace Detail
+#endif
+
 
 /*!
  * \ingroup Assembly
@@ -79,7 +95,9 @@ class SubDomainStaggeredLocalAssemblerBase : public FVLocalAssemblerBase<TypeTag
 
     using CouplingManager = typename Assembler::CouplingManager;
 
-    static constexpr auto numEq = GetPropType<TypeTag, Properties::ModelTraits>::numEq();
+    using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
+    static constexpr auto numEq = ModelTraits::numEq();
+    static constexpr bool isFreeFlowModel =  decltype(isValid(Detail::isFreeFlowModel())(ModelTraits()))::value;
 
 public:
     static constexpr auto domainId = typename Dune::index_constant<id>();
@@ -87,7 +105,7 @@ public:
     static constexpr auto faceId = typename Dune::index_constant<1>();
 
     static constexpr auto numEqCellCenter = CellCenterResidualValue::dimension;
-    static constexpr auto faceOffset = numEqCellCenter;
+    static constexpr auto numEqFace = FaceResidualValue::dimension;
 
     using ParentType::ParentType;
 
@@ -247,10 +265,6 @@ public:
         if (!this->assembler().isStationaryProblem())
             residual += evalLocalStorageResidualForFace(scvf);
 
-        this->localResidual().evalDirichletBoundariesForFace(residual, this->problem(), this->element(),
-                                                             this->fvGeometry(), scvf, elemVolVars, elemFaceVars,
-                                                             this->elemBcTypes(), this->elemFluxVarsCache());
-
         return residual;
     }
 
@@ -369,6 +383,93 @@ private:
         forEach(otherDomainIds, [&](auto&& domainJ)
         {
             this->asImp_().assembleJacobianFaceCoupling(domainJ, jacRow[domainJ], residual, gridVariablesI);
+        });
+
+        auto applyDirichlet = [&] (const auto& scvfI,
+                                   const auto& dirichletValues,
+                                   const auto eqIdx,
+                                   const auto pvIdx)
+        {
+            res[scvfI.dofIndex()][eqIdx] = this->curElemFaceVars()[scvfI].priVars()[pvIdx] - dirichletValues[pvIdx];
+            applyDirichletToJacobian(jacRow, scvfI.dofIndex(), eqIdx);
+        };
+
+        enforceDirichletConstraints(faceId, applyDirichlet);
+    }
+
+    //! incorporate Dirichlet boundary conditions for the faces dofs. Specialization for free flow models.
+    template<class ApplyDirichletFunctionType, bool isFF = isFreeFlowModel, std::enable_if_t<isFF, int> = 0>
+    void enforceDirichletConstraints(Dune::index_constant<1>, ApplyDirichletFunctionType applyDirichlet) const
+    {
+        using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
+        // account for Dirichlet boundary conditions
+        for (auto&& scvf : scvfs(this->fvGeometry()))
+        {
+            if (scvf.boundary())
+            {
+                const auto bcTypes = problem().boundaryTypes(this->element(), scvf);
+                if (bcTypes.isDirichlet(Indices::velocity(scvf.directionIndex())))
+                {
+                    // set a fixed value for the velocity for Dirichlet boundary conditions
+                    const Scalar dirichletValue = problem().dirichlet(this->element(), scvf)[Indices::velocity(scvf.directionIndex())];
+                    applyDirichlet(scvf, FaceResidualValue(dirichletValue), 0, 0);
+                }
+                else if (bcTypes.isSymmetry())
+                {
+                    // for symmetry boundary conditions, there is no flow accross the boundary and
+                    // we therefore treat it like a Dirichlet boundary conditions with zero velocity
+                    const Scalar dirichletValue = 0.0;
+                    applyDirichlet(scvf, FaceResidualValue(dirichletValue), 0, 0);
+                }
+            }
+            // TODO internal constraints
+        }
+    }
+
+    //! incorporate Dirichlet boundary conditions for the faces dofs.
+    template<class ApplyDirichletFunctionType, bool isFF = isFreeFlowModel, std::enable_if_t<!isFF, int> = 0>
+    void enforceDirichletConstraints(Dune::index_constant<1>, ApplyDirichletFunctionType applyDirichlet) const
+    {
+        // account for Dirichlet boundary conditions
+        for (auto&& scvf : scvfs(this->fvGeometry()))
+        {
+            if (scvf.boundary())
+            {
+                const auto bcTypes = problem().boundaryTypes(this->element(), scvf);
+                if (bcTypes.hasDirichlet())
+                {
+                    for (int eqIdx = 0; eqIdx < numEqFace; ++ eqIdx)
+                    {
+                        if (bcTypes.isDirichlet(eqIdx))
+                        {
+                            const Scalar dirichletValues = problem().dirichlet(this->element(), scvf);
+                            const auto pvIdx = bcTypes.eqToDirichletIndex(eqIdx);
+                            applyDirichlet(scvf, dirichletValues, eqIdx, pvIdx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    //! Incorporate Dirichlet BCs into the Jacobian by setting the respective line to zero,
+    //! with the exception of the diagonal entry where a one is set.
+    template<class JacobianMatrixRow>
+    void applyDirichletToJacobian(JacobianMatrixRow& jacRow,
+                                  const std::size_t dofIndex,
+                                  const std::size_t eqIdx) const
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(jacRow)), [&, domainId = domainId](auto&& i)
+        {
+            auto& rowI = jacRow[i][dofIndex];
+            for (auto col = rowI.begin(); col != rowI.end(); ++col)
+            {
+                rowI[col.index()][eqIdx] = 0.0;
+                // set the diagonal entry to 1.0
+                if ((i == domainId) && (col.index() == dofIndex))
+                    rowI[col.index()][eqIdx][eqIdx] = 1.0;
+            }
         });
     }
 
@@ -506,7 +607,6 @@ class SubDomainStaggeredLocalAssembler<id, TypeTag, Assembler, DiffMethod::numer
     using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
 
     static constexpr bool enableGridFluxVarsCache = getPropValue<TypeTag, Properties::EnableGridFluxVariablesCache>();
-    static constexpr int maxNeighbors = 4*(2*ModelTraits::dim());
     static constexpr auto domainI = Dune::index_constant<id>();
     static constexpr auto cellCenterId = typename Dune::index_constant<0>();
     static constexpr auto faceId = typename Dune::index_constant<1>();
