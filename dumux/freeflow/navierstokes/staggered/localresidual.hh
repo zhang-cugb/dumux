@@ -228,42 +228,6 @@ public:
     }
 
     /*!
-     * \brief Evaluate Dirichlet (fixed value) boundary conditions for a face dof
-     */
-    void evalDirichletBoundariesForFace(FaceResidual& residual,
-                                        const Problem& problem,
-                                        const Element& element,
-                                        const FVElementGeometry& fvGeometry,
-                                        const SubControlVolumeFace& scvf,
-                                        const ElementVolumeVariables& elemVolVars,
-                                        const ElementFaceVariables& elemFaceVars,
-                                        const ElementBoundaryTypes& elemBcTypes,
-                                        const ElementFluxVariablesCache& elemFluxVarsCache) const
-    {
-        if (scvf.boundary())
-        {
-            // handle the actual boundary conditions:
-            const auto bcTypes = problem.boundaryTypes(element, scvf);
-
-            if(bcTypes.isDirichlet(Indices::velocity(scvf.directionIndex())))
-            {
-                // set a fixed value for the velocity for Dirichlet boundary conditions
-                const Scalar velocity = elemFaceVars[scvf].velocitySelf();
-                const Scalar dirichletValue = problem.dirichlet(element, scvf)[Indices::velocity(scvf.directionIndex())];
-                residual = velocity - dirichletValue;
-            }
-            else if(bcTypes.isSymmetry())
-            {
-                // for symmetry boundary conditions, there is no flow accross the boundary and
-                // we therefore treat it like a Dirichlet boundary conditions with zero velocity
-                const Scalar velocity = elemFaceVars[scvf].velocitySelf();
-                const Scalar fixedValue = 0.0;
-                residual = velocity - fixedValue;
-            }
-        }
-    }
-
-    /*!
      * \brief Evaluate boundary boundary fluxes for a face dof
      */
     FaceResidual computeBoundaryFluxForFace(const Problem& problem,
