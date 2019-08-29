@@ -145,7 +145,7 @@ public:
       unitOuterNormal_(is.centerUnitOuterNormal()),
       scvfIndex_(scvfIndex),
       scvIndices_(scvIndices),
-      boundary_(is.boundary()),
+      boundary_(is.boundary() && !is.neighbor()),
 
       axisData_(geometryHelper.axisData()),
       pairData_(std::move(geometryHelper.pairData())),
