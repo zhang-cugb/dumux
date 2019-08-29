@@ -446,6 +446,8 @@ private:
             SubDomainAssembler<i> subDomainAssembler(*this, element, curSol, *couplingManager_);
             subDomainAssembler.assembleJacobianAndResidual(jacRow, subRes, gridVariablesTuple_);
         });
+
+        enforcePeriodicConstraints_(domainId, jacRow, subRes, fvGridGeometry(domainId));
     }
 
     template<std::size_t i, class SubRes>
@@ -492,6 +494,45 @@ private:
         return getCouplingJacobianPattern<isImplicit()>(*couplingManager_,
                                                         domainI, fvGridGeometry(domainI),
                                                         domainJ, fvGridGeometry(domainJ));
+    }
+
+    template<std::size_t i, class JacRow, class SubRes, class GG> std::enable_if_t<GG::discMethod == DiscretizationMethod::staggered, void>
+    enforcePeriodicConstraints_(Dune::index_constant<i> domainI, JacRow& jacRow, SubRes& res, const GG& fvGridGeometry)
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(jacRow)), [&, domainI = domainI](auto&& j)
+        {
+            auto& jac = jacRow[j];
+
+            if (i == j) // diagonal block
+            {
+                for (const auto& m : fvGridGeometry.periodicFaceDofMap())
+                {
+                    if (m.first < m.second)
+                    {
+                        // add the second row to the first
+                        res[m.first] += res[m.second];
+                        const auto end = jac[m.second].end();
+                        for (auto it = jac[m.second].begin(); it != end; ++it)
+                            jac[m.first][it.index()] += (*it);
+
+                        // enforce constraint in second row
+                        for (auto it = jac[m.second].begin(); it != end; ++it)
+                            (*it) = it.index() == m.second ? 1.0 : it.index() == m.first ? -1.0 : 0.0;
+                    }
+                }
+            }
+            else // coupling block
+            {
+                for (const auto& m : fvGridGeometry.periodicFaceDofMap())
+                {
+                    auto& rowI = jac[m.first];
+                    for (auto col = rowI.begin(); col != rowI.end(); ++col)
+                        rowI[col.index()] = 0.0;
+                }
+            }
+        });
+
     }
 
     //! pointer to the problem to be solved
