@@ -130,6 +130,9 @@ public:
      */
     std::size_t numDofs() const
     { return this->fvGridGeometry_->numCellCenterDofs(); }
+
+    const auto& periodicFaceDofMap() const
+    { return this->fvGridGeometry_->periodicFaceDofMap(); }
 };
 
 /*!
@@ -155,6 +158,9 @@ public:
      */
     std::size_t numDofs() const
     { return this->fvGridGeometry_->numFaceDofs(); }
+
+    const auto& periodicFaceDofMap() const
+    { return this->fvGridGeometry_->periodicFaceDofMap(); }
 };
 
 /*!
@@ -314,7 +320,7 @@ public:
                 geometryHelper.updateLocalFace(intersectionMapper_, intersection);
                 const int localFaceIndex = geometryHelper.localFaceIndex();
 
-                // inner sub control volume faces
+                // inner and periodic sub control volume faces
                 if (intersection.neighbor())
                 {
                     auto nIdx = this->elementMapper().index(intersection.outside());
@@ -325,6 +331,18 @@ public:
                                         geometryHelper);
                     localToGlobalScvfIndices_[eIdx][localFaceIndex] = scvfIdx;
                     scvfsIndexSet.push_back(scvfIdx++);
+
+                    // periodic boundaries
+                    if (intersection.boundary())
+                    {
+                        const auto ownDofIndex = intersectionMapper_.globalIntersectionIndex(element, intersection.indexInInside());
+                        const auto periodicDofIndex = intersectionMapper_.globalIntersectionIndex(intersection.outside(), intersection.indexInOutside());
+
+                        using std::min; using std::max;
+                        const auto key = min(ownDofIndex, periodicDofIndex);
+                        const auto value = max(ownDofIndex, periodicDofIndex);
+                        periodicFaceDofMap_[key] = value;
+                    }
                 }
                 // boundary sub control volume faces
                 else if (intersection.boundary())
@@ -347,6 +365,14 @@ public:
 
         // build the connectivity map for an effecient assembly
         connectivityMap_.update(*this);
+
+        std::cout << "printing map \n \n" << std::endl;
+
+        // TODO debug output
+        for (auto&& x : periodicFaceDofMap_)
+            std::cout << "key " << x.first << ", val " << x.second << std::endl;
+
+        std::cout << "printing map done \n \n" << std::endl;
     }
 
     //! Get a sub control volume with a global scv index
@@ -412,6 +438,10 @@ public:
     bool hasBoundaryScvf(GridIndexType eIdx) const
     { return hasBoundaryScvf_[eIdx]; }
 
+    //! Returns the map between dofs across periodic boundaries
+    const std::unordered_map<GridIndexType, GridIndexType>& periodicFaceDofMap() const
+    { return periodicFaceDofMap_; }
+
 private:
 
     // mappers
@@ -424,6 +454,9 @@ private:
     std::vector<std::vector<GridIndexType>> localToGlobalScvfIndices_;
     GridIndexType numBoundaryScvf_;
     std::vector<bool> hasBoundaryScvf_;
+
+    // a map for periodic boundary vertices
+    std::unordered_map<GridIndexType, GridIndexType> periodicFaceDofMap_;
 };
 
 /*!
