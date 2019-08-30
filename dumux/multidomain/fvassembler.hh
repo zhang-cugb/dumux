@@ -499,12 +499,15 @@ private:
     template<std::size_t i, class JacRow, class SubRes, class GG> std::enable_if_t<GG::discMethod == DiscretizationMethod::staggered, void>
     enforcePeriodicConstraints_(Dune::index_constant<i> domainI, JacRow& jacRow, SubRes& res, const GG& fvGridGeometry)
     {
+        if (i != 1)
+            return;
+
         using namespace Dune::Hybrid;
         forEach(integralRange(Dune::Hybrid::size(jacRow)), [&, domainI = domainI](auto&& j)
         {
             auto& jac = jacRow[j];
 
-            if (i == j) // diagonal block
+            if (i == j && i == 1) // diagonal block
             {
                 for (const auto& m : fvGridGeometry.periodicFaceDofMap())
                 {
@@ -522,7 +525,7 @@ private:
                     }
                 }
             }
-            else // coupling block
+            else if(j != 0) // coupling block
             {
                 for (const auto& m : fvGridGeometry.periodicFaceDofMap())
                 {
