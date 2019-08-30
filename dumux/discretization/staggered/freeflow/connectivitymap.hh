@@ -94,6 +94,50 @@ public:
                 computeFaceToFaceStencil_(faceToFaceMap_[scvfIdx], fvGeometry, scvf);
             }
         }
+
+        // for (auto&& element: elements(fvGridGeometry.gridView()))
+        // {
+        //     // restrict the FvGeometry locally and bind to the element
+        //     auto fvGeometry = localView(fvGridGeometry);
+        //     fvGeometry.bindElement(element);
+        //
+        //     // loop over sub control faces
+        //     for (auto&& scvf : scvfs(fvGeometry))
+        //     {
+        //         const  auto ownDofIndex = scvf.dofIndex();
+        //         if (fvGridGeometry.periodicFaceDofMap().count(ownDofIndex))
+        //         {
+        //             std::cout << " at dof " << ownDofIndex << std::endl;
+        //             const auto periodicDofIndex = fvGridGeometry.periodicFaceDofMap().at(ownDofIndex);
+        //             const auto ownStencilCopy = faceToFaceMap_[scvf.index()];
+        //             auto& ownStencil = faceToFaceMap_[scvf.index()];
+        //
+        //             const auto& neighborElement = fvGridGeometry.element(scvf.outsideScvIdx());
+        //             auto neighborFvGeometry = localView(fvGridGeometry);
+        //             neighborFvGeometry.bindElement(neighborElement);
+        //
+        //             for (auto&& neighborScvf : scvfs(neighborFvGeometry))
+        //             {
+        //                 if (neighborScvf.dofIndex() == periodicDofIndex)
+        //                 {
+        //                     std::cout << "add stencil of " << periodicDofIndex << std::endl;
+        //                     auto& periodicStencil = faceToFaceMap_[neighborScvf.index()];
+        //                     ownStencil.insert(ownStencil.end(), periodicStencil.begin(), periodicStencil.end());
+        //                     ownStencil.push_back(periodicDofIndex);
+        //                     periodicStencil.insert(periodicStencil.end(), ownStencilCopy.begin(), ownStencilCopy.end());
+        //                     periodicStencil.push_back(ownDofIndex);
+        //
+        //                     std::sort(periodicStencil.begin(), periodicStencil.end());
+        //                     periodicStencil.erase(std::unique(periodicStencil.begin(), periodicStencil.end()), periodicStencil.end());
+        //
+        //                     std::sort(ownStencil.begin(), ownStencil.end());
+        //                     ownStencil.erase(std::unique(ownStencil.begin(), ownStencil.end()), ownStencil.end());
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     //! Returns the stencil of a cell center dof w.r.t. other cell center dofs
