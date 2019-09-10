@@ -69,7 +69,7 @@ std::function<std::string(int,int)> createFacePVNameFunction(const std::string& 
 
 // forward declare
 template<class T, class U>
-class StaggeredVtkOutputModule;
+class MyStaggeredVtkOutputModule;
 
 /*!
  * \ingroup NavierStokesModel
@@ -82,7 +82,7 @@ class NavierStokesIOFields
     struct isStaggered : public std::false_type {};
 
     template<class... Args>
-    struct isStaggered<StaggeredVtkOutputModule<Args...>>
+    struct isStaggered<MyStaggeredVtkOutputModule<Args...>>
     : public std::true_type {};
 
 public:

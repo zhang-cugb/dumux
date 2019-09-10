@@ -39,7 +39,7 @@
 #include "facevariables.hh"
 #include "boundarytypes.hh"
 #include "velocityoutput.hh"
-#include "fvgridgeometrytraits.hh"
+#include <mydumux/discretization/staggered/freeflow/fvgridgeometrytraits.hh>
 #include "gridvolumevariables.hh"
 
 namespace Dumux {

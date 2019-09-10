@@ -71,7 +71,7 @@ public:
                                      const std::string& name = "newton_convergence")
     : fvGridGeometry_(fvGridGeometry)
     , ccWriter_(fvGridGeometry.gridView(), name, "", "")
-    , faceWriter_(std::make_shared<PointCloudVtkWriter<Scalar, GlobalPosition>>(coordinates_))
+    , faceWriter_(std::make_shared<MyPointCloudVtkWriter<Scalar, GlobalPosition>>(coordinates_))
     , faceSequenceWriter_(faceWriter_, name + "-face", "","",
                           fvGridGeometry.gridView().comm().rank(),
                           fvGridGeometry.gridView().comm().size())
@@ -168,8 +168,8 @@ private:
     Dune::VTKSequenceWriter<GridView> ccWriter_;
 
     std::vector<GlobalPosition> coordinates_;
-    std::shared_ptr<PointCloudVtkWriter<Scalar, GlobalPosition>> faceWriter_;
-    VTKSequenceWriter<PointCloudVtkWriter<Scalar, GlobalPosition>> faceSequenceWriter_;
+    std::shared_ptr<MyPointCloudVtkWriter<Scalar, GlobalPosition>> faceWriter_;
+    VTKSequenceWriter<MyPointCloudVtkWriter<Scalar, GlobalPosition>> faceSequenceWriter_;
 
     std::array<std::vector<Scalar>, numEqCellCenter> defCellCenter_;
     std::array<std::vector<Scalar>, numEqCellCenter> deltaCellCenter_;

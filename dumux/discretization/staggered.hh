@@ -42,7 +42,7 @@
 #include <dumux/discretization/staggered/fvgridgeometry.hh>
 #include <dumux/discretization/staggered/gridfacevariables.hh>
 #include <dumux/discretization/staggered/facesolution.hh>
-#include <dumux/discretization/staggered/subcontrolvolumeface.hh>
+#include <mydumux/discretization/staggered/subcontrolvolumeface.hh>
 
 #include <dune/istl/multitypeblockvector.hh>
 #include <dune/istl/multitypeblockmatrix.hh>

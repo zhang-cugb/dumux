@@ -231,12 +231,9 @@ public:
                                const auto& elemFluxVarsCache)
         {
             LocalResidual localResidual(&problem_());
-
-            if (scvf.boundary())
-                return localResidual.computeBoundaryFluxForCellCenter(problem_(), element, fvGeometry, scvf, elemVolVars, elemFaceVars, /*elemBcTypes*/{}, elemFluxVarsCache);
-            else
-                return localResidual.computeFluxForCellCenter(problem_(), element, fvGeometry, elemVolVars, elemFaceVars, scvf, elemFluxVarsCache);
+            return localResidual.computeFluxForCellCenter(problem_(), element, fvGeometry, elemVolVars, elemFaceVars, scvf, elemFluxVarsCache);
         };
+
 
         calculateFluxes(fluxType);
     }
