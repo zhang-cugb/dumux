@@ -55,7 +55,7 @@
 #include <dumux/freeflow/nonisothermal/iofields.hh>
 
 #include "localresidual.hh"
-#include "volumevariables.hh"
+#include <mydumux/freeflow/navierstokes/volumevariables.hh>
 #include "fluxvariables.hh"
 #include "indices.hh"
 #include "iofields.hh"

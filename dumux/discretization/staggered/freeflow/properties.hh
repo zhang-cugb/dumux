@@ -29,18 +29,18 @@
 #define DUMUX_STAGGERD_FREE_FLOW_PROPERTIES_HH
 
 #include <dumux/common/properties.hh>
-#include <dumux/common/intersectionmapper.hh>
+#include <mydumux/common/intersectionmapper.hh>
 #include <dumux/common/defaultmappertraits.hh>
 
 #include <dumux/discretization/staggered.hh>
-#include <dumux/discretization/staggered/fvgridgeometry.hh>
+#include <mydumux/discretization/staggered/fvgridgeometry.hh>
 #include <dumux/freeflow/properties.hh>
 
-#include "facevariables.hh"
+#include <mydumux/discretization/staggered/freeflow/facevariables.hh>
 #include "boundarytypes.hh"
-#include "velocityoutput.hh"
-#include "fvgridgeometrytraits.hh"
-#include "gridvolumevariables.hh"
+#include <mydumux/discretization/staggered/freeflow/velocityoutput.hh>
+#include <mydumux/discretization/staggered/freeflow/fvgridgeometrytraits.hh>
+#include <mydumux/discretization/staggered/freeflow/gridvolumevariables.hh>
 
 namespace Dumux {
 namespace Properties {
@@ -97,8 +97,9 @@ private:
     using FacePrimaryVariables = GetPropType<TypeTag, Properties::FacePrimaryVariables>;
     using GridView = GetPropType<TypeTag, Properties::GridView>;
     static constexpr auto upwindSchemeOrder = getPropValue<TypeTag, Properties::UpwindSchemeOrder>();
+    using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
 public:
-    using type = StaggeredFaceVariables<FacePrimaryVariables, GridView::dimension, upwindSchemeOrder>;
+    using type = StaggeredFaceVariables<ModelTraits, FacePrimaryVariables, GridView::dimension, upwindSchemeOrder>;
 };
 
 //! Set the default global volume variables cache vector class
@@ -108,8 +109,11 @@ struct GridVolumeVariables<TypeTag, TTag::StaggeredFreeFlowModel>
 private:
     using Problem = GetPropType<TypeTag, Properties::Problem>;
     using VolumeVariables = GetPropType<TypeTag, Properties::VolumeVariables>;
+    using GridView = typename GET_PROP_TYPE(TypeTag, GridView);
+    using SubControlVolume = typename GET_PROP_TYPE(TypeTag, FVGridGeometry)::SubControlVolume;
+    using SubControlVolumeFace = typename GET_PROP_TYPE(TypeTag, FVGridGeometry)::SubControlVolumeFace;
     static constexpr auto enableCache = getPropValue<TypeTag, Properties::EnableGridVolumeVariablesCache>();
-    using Traits = StaggeredGridDefaultGridVolumeVariablesTraits<Problem, VolumeVariables>;
+    using Traits = StaggeredGridDefaultGridVolumeVariablesTraits<Problem, VolumeVariables, GridView, SubControlVolume, SubControlVolumeFace>;
 public:
     using type = StaggeredGridVolumeVariables<Traits, enableCache>;
 };

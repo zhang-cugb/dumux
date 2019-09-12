@@ -83,6 +83,13 @@ public:
         return asImp_().elementIndex();
     }
 
+    //! Index of the outside sub control volume face
+    GridIndexType outsideScvfIdx() const
+    {
+        return asImp_().outsideScvfIdx();
+    }
+
+
 private:
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this);}

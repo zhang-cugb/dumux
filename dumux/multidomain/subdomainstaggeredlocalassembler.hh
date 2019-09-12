@@ -37,7 +37,7 @@
 #include <dumux/common/numericdifferentiation.hh>
 #include <dumux/common/typetraits/utility.hh>
 #include <dumux/assembly/diffmethod.hh>
-#include <dumux/assembly/fvlocalassemblerbase.hh>
+#include <mydumux/assembly/fvlocalassemblerbase.hh>
 #include <dumux/discretization/staggered/elementsolution.hh>
 
 namespace Dumux {
