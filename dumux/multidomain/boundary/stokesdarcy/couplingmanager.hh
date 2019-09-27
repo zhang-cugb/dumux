@@ -78,25 +78,28 @@ private:
     template<std::size_t id> using GridView = GetPropType<SubDomainTypeTag<id>, Properties::GridView>;
     template<std::size_t id> using Problem = GetPropType<SubDomainTypeTag<id>, Properties::Problem>;
     template<std::size_t id> using NumEqVector = GetPropType<SubDomainTypeTag<id>, Properties::NumEqVector>;
-    template<std::size_t id> using ElementVolumeVariables = typename GetPropType<SubDomainTypeTag<id>, Properties::GridVolumeVariables>::LocalView;
     template<std::size_t id> using GridVolumeVariables = GetPropType<SubDomainTypeTag<id>, Properties::GridVolumeVariables>;
-    template<std::size_t id> using VolumeVariables = typename GetPropType<SubDomainTypeTag<id>, Properties::GridVolumeVariables>::VolumeVariables;
+    template<std::size_t id> using ElementVolumeVariables = typename GridVolumeVariables<id>::LocalView;
+    template<std::size_t id> using VolumeVariables = typename GridVolumeVariables<id>::VolumeVariables;
+    template<std::size_t id> using GridFaceVariables = GetPropType<SubDomainTypeTag<id>, Properties::GridFaceVariables>;
+    template<std::size_t id> using ElementFaceVariables = typename GridFaceVariables<id>::LocalView;
+    template<std::size_t id> using FaceVariables = typename ElementFaceVariables<id>::FaceVariables;
     template<std::size_t id> using FVGridGeometry = GetPropType<SubDomainTypeTag<id>, Properties::FVGridGeometry>;
     template<std::size_t id> using FVElementGeometry = typename FVGridGeometry<id>::LocalView;
     template<std::size_t id> using ElementBoundaryTypes = GetPropType<SubDomainTypeTag<id>, Properties::ElementBoundaryTypes>;
     template<std::size_t id> using ElementFluxVariablesCache = typename GetPropType<SubDomainTypeTag<id>, Properties::GridFluxVariablesCache>::LocalView;
-    template<std::size_t id> using GridVariables = GetPropType<SubDomainTypeTag<id>, Properties::GridVariables>;
     template<std::size_t id> using Element = typename GridView<id>::template Codim<0>::Entity;
     template<std::size_t id> using PrimaryVariables = typename MDTraits::template SubDomain<id>::PrimaryVariables;
+    template<std::size_t id> using SubControlVolume  = typename FVElementGeometry<id>::SubControlVolume;
     template<std::size_t id> using SubControlVolumeFace  = typename FVElementGeometry<id>::SubControlVolumeFace;
 
+    template<std::size_t id> using GridVariables = typename MDTraits::template SubDomain<id>::GridVariables;
+    using GridVariablesTuple = typename MDTraits::template TupleOfSharedPtr<GridVariables>;
     using CellCenterSolutionVector = GetPropType<StokesTypeTag, Properties::CellCenterSolutionVector>;
-
     using VelocityVector = typename Element<stokesIdx>::Geometry::GlobalCoordinate;
-
     using CouplingMapper = StokesDarcyCouplingMapper<MDTraits>;
 
-    struct StationaryStokesCouplingContext
+    struct StokesCouplingContext
     {
         Element<darcyIdx> element;
         FVElementGeometry<darcyIdx> fvGeometry;
@@ -105,14 +108,19 @@ private:
         VolumeVariables<darcyIdx> volVars;
     };
 
-    struct StationaryDarcyCouplingContext
+    struct DarcyCouplingContext
     {
         Element<stokesIdx> element;
         FVElementGeometry<stokesIdx> fvGeometry;
         std::size_t stokesScvfIdx;
         std::size_t darcyScvfIdx;
         VelocityVector velocity;
-        VolumeVariables<stokesIdx> volVars;
+        ElementVolumeVariables<stokesIdx> elemVolVars;
+        ElementFaceVariables<stokesIdx> elemFaceVars;
+        ElementFluxVariablesCache<stokesIdx> elemFluxVarsCache;
+
+        const auto& getStokesScvf() const
+        { return fvGeometry.scvf(stokesScvfIdx); }
     };
 public:
 
@@ -244,11 +252,17 @@ public:
         // prepare the coupling context
         const auto& stokesElementIndices = couplingMapper_.darcyElementToStokesElementMap().at(darcyElementIdx);
         auto stokesFvGeometry = localView(this->problem(stokesIdx).fvGridGeometry());
+        auto stokesElemVolVars = localView(gridVars_(stokesIdx).curGridVolVars());
+        auto stokesElemFaceVars = localView(gridVars_(stokesIdx).curGridFaceVars());
+        auto stokesElemFluxVarsCache = localView(gridVars_(stokesIdx).gridFluxVarsCache());
 
         for(auto&& indices : stokesElementIndices)
         {
             const auto& stokesElement = this->problem(stokesIdx).fvGridGeometry().boundingBoxTree().entitySet().entity(indices.eIdx);
             stokesFvGeometry.bindElement(stokesElement);
+            stokesElemVolVars.bind(stokesElement, stokesFvGeometry, this->curSol()[stokesCellCenterIdx]);
+            stokesElemFaceVars.bind(stokesElement, stokesFvGeometry, this->curSol()[stokesFaceIdx]);
+            stokesElemFluxVarsCache.bind(stokesElement, stokesFvGeometry, stokesElemVolVars);
 
             VelocityVector faceVelocity(0.0);
 
@@ -258,16 +272,8 @@ public:
                     faceVelocity[scvf.directionIndex()] = this->curSol()[stokesFaceIdx][scvf.dofIndex()];
             }
 
-            using PriVarsType = typename VolumeVariables<stokesCellCenterIdx>::PrimaryVariables;
-            const auto& cellCenterPriVars = this->curSol()[stokesCellCenterIdx][indices.eIdx];
-            const auto elemSol = makeElementSolutionFromCellCenterPrivars<PriVarsType>(cellCenterPriVars);
-
-            VolumeVariables<stokesIdx> stokesVolVars;
-            for(const auto& scv : scvs(stokesFvGeometry))
-                stokesVolVars.update(elemSol, this->problem(stokesIdx), stokesElement, scv);
-
             // add the context
-            darcyCouplingContext_.push_back({stokesElement, stokesFvGeometry, indices.scvfIdx, indices.flipScvfIdx, faceVelocity, stokesVolVars});
+            darcyCouplingContext_.push_back({stokesElement, stokesFvGeometry, indices.scvfIdx, indices.flipScvfIdx, faceVelocity, stokesElemVolVars, stokesElemFaceVars, stokesElemFluxVarsCache});
         }
     }
 
@@ -302,14 +308,14 @@ public:
         {
             const auto stokesElemIdx = this->problem(stokesIdx).fvGridGeometry().elementMapper().index(data.element);
 
-            if(stokesElemIdx != dofIdxGlobalJ)
+            if (stokesElemIdx != dofIdxGlobalJ)
                 continue;
 
             using PriVarsType = typename VolumeVariables<stokesCellCenterIdx>::PrimaryVariables;
             const auto elemSol = makeElementSolutionFromCellCenterPrivars<PriVarsType>(priVars);
 
-            for(const auto& scv : scvs(data.fvGeometry))
-                data.volVars.update(elemSol, this->problem(stokesIdx), data.element, scv);
+            for (const auto& scv : scvs(data.fvGeometry))
+                getVolVarAccess_(domainJ, gridVars_(stokesIdx).curGridVolVars(), data.elemVolVars, scv).update(elemSol, this->problem(stokesIdx), data.element, scv);
         }
     }
 
@@ -321,17 +327,26 @@ public:
                                const LocalAssemblerI& localAssemblerI,
                                Dune::index_constant<stokesFaceIdx> domainJ,
                                const std::size_t dofIdxGlobalJ,
-                               const PrimaryVariables<1>& priVars,
+                               const PrimaryVariables<stokesFaceIdx>& priVars,
                                int pvIdxJ)
     {
         this->curSol()[domainJ][dofIdxGlobalJ] = priVars;
+        const auto& stokesProblem = this->problem(stokesIdx);
 
         for (auto& data : darcyCouplingContext_)
         {
-            for(const auto& scvf : scvfs(data.fvGeometry))
+            for (const auto& scvf : scvfs(data.fvGeometry))
             {
-                if(scvf.dofIndex() == dofIdxGlobalJ)
+                if (scvf.dofIndex() == dofIdxGlobalJ)
+                {
                     data.velocity[scvf.directionIndex()] = priVars;
+
+                    using FaceSolution = GetPropType<SubDomainTypeTag<stokesIdx>, Properties::StaggeredFaceSolution>;
+                    FaceSolution faceSol(scvf, this->curSol()[domainJ], stokesProblem.fvGridGeometry());
+                    // faceSol[dofIdxGlobalJ][pvIdxJ] = priVars;
+                    auto& faceVars = getFaceVarAccess_(domainJ, gridVars_(stokesIdx).curGridFaceVars(), data.elemFaceVars, scvf);
+                    faceVars.update(faceSol, stokesProblem, data.element, data.fvGeometry, scvf);
+                }
             }
         }
     }
@@ -522,6 +537,35 @@ public:
         return couplingMapper_.isCoupledDarcyScvf(scvf.index());
     }
 
+    /*!
+     * \brief set the pointers to the grid variables
+     * \param problems A tuple of shared pointers to the grid variables
+     */
+    void setGridVariables(GridVariablesTuple&& gridVariables)
+    { gridVariables_ = gridVariables; }
+
+    /*!
+     * \brief set a pointer to one of the grid variables
+     * \param problem a pointer to the grid variables
+     * \param domainIdx the domain index of the grid variables
+     */
+    template<class  GridVariables, std::size_t i>
+    void setGridVariables(std::shared_ptr<GridVariables> gridVariables, Dune::index_constant<i> domainIdx)
+    { std::get<i>(gridVariables_) = gridVariables; }
+
+    /*!
+     * \brief Return a reference to the grid variables of a sub problem
+     * \param domainIdx The domain index
+     */
+    template<std::size_t i>
+    const GridVariables<i>& gridVars_(Dune::index_constant<i> domainIdx) const
+    {
+        if (std::get<i>(gridVariables_))
+            return *std::get<i>(gridVariables_);
+        else
+            DUNE_THROW(Dune::InvalidStateException, "The gridVariables pointer was not set. Use setGridVariables() before calling this function");
+    }
+
 protected:
 
     //! Return a reference to an empty stencil
@@ -533,6 +577,48 @@ protected:
         std::sort(stencil.begin(), stencil.end());
         stencil.erase(std::unique(stencil.begin(), stencil.end()), stencil.end());
     }
+
+    /*!
+     * \brief Return a reference to the grid variables of a sub problem
+     * \param domainIdx The domain index
+     */
+    template<std::size_t i>
+    GridVariables<i>& gridVars_(Dune::index_constant<i> domainIdx)
+    {
+        if (std::get<i>(gridVariables_))
+            return *std::get<i>(gridVariables_);
+        else
+            DUNE_THROW(Dune::InvalidStateException, "The gridVariables pointer was not set. Use setGridVariables() before calling this function");
+    }
+
+    // /*!
+    //  * \brief Return a reference to the grid variables of a sub problem
+    //  * \param domainIdx The domain index
+    //  */
+    // template<std::size_t i>
+    // const GridVariables<i>& gridVars_(Dune::index_constant<i> domainIdx) const
+    // {
+    //     if (std::get<i>(gridVariables_))
+    //         return *std::get<i>(gridVariables_);
+    //     else
+    //         DUNE_THROW(Dune::InvalidStateException, "The gridVariables pointer was not set. Use setGridVariables() before calling this function");
+    // }
+
+    template<std::size_t i, std::enable_if_t<!getPropValue<SubDomainTypeTag<i>, Properties::EnableGridVolumeVariablesCache>(), int> = 0>
+    VolumeVariables<i>& getVolVarAccess_(Dune::index_constant<i> domainIdx, GridVolumeVariables<i>& gridVolVars, ElementVolumeVariables<i>& elemVolVars, const SubControlVolume<i>& scv)
+    { elemVolVars[scv]; }
+
+    template<std::size_t i, std::enable_if_t<getPropValue<SubDomainTypeTag<i>, Properties::EnableGridVolumeVariablesCache>(), int> = 0>
+    VolumeVariables<i>& getVolVarAccess_(Dune::index_constant<i> domainIdx, GridVolumeVariables<i>& gridVolVars, ElementVolumeVariables<i>& elemVolVars, const SubControlVolume<i>& scv)
+    { return gridVolVars.volVars(scv); }
+
+    template<std::size_t i, std::enable_if_t<!getPropValue<SubDomainTypeTag<i>, Properties::EnableGridFaceVariablesCache>(), int> = 0>
+    FaceVariables<i>& getFaceVarAccess_(Dune::index_constant<i> domainIdx, GridFaceVariables<i>& gridFaceVariables, ElementFaceVariables<i>& elemFaceVars, const SubControlVolumeFace<i>& scvf)
+    { return elemFaceVars[scvf]; }
+
+    template<std::size_t i, std::enable_if_t<getPropValue<SubDomainTypeTag<i>, Properties::EnableGridFaceVariablesCache>(), int> = 0>
+    FaceVariables<i>& getFaceVarAccess_(Dune::index_constant<i> domainIdx, GridFaceVariables<i>& gridFaceVariables, ElementFaceVariables<i>& elemFaceVars, const SubControlVolumeFace<i>& scvf)
+    { return gridFaceVariables.faceVars(scvf.index()); }
 
 private:
 
@@ -548,11 +634,16 @@ private:
     ////////////////////////////////////////////////////////////////////////////
     //! The coupling context
     ////////////////////////////////////////////////////////////////////////////
-    mutable std::vector<StationaryStokesCouplingContext> stokesCouplingContext_;
-    mutable std::vector<StationaryDarcyCouplingContext> darcyCouplingContext_;
+    mutable std::vector<StokesCouplingContext> stokesCouplingContext_;
+    mutable std::vector<DarcyCouplingContext> darcyCouplingContext_;
 
     mutable std::size_t boundStokesElemIdx_;
     mutable std::size_t boundDarcyElemIdx_;
+
+    /*!
+     * \brief A tuple of std::shared_ptrs to the grid variables of the sub problems
+     */
+    GridVariablesTuple gridVariables_;
 
     CouplingMapper couplingMapper_;
 };
