@@ -328,6 +328,86 @@ public:
     }
 
     /*!
+     * \brief Returns the reconstructed free-flow pressure at the coupling interface
+     *        corresponding to the normal momentum flux across the interface, i.e.,
+     *        [p]^PM = [div(vv^T - mu (gradV + gradV^T) + gradp)]^FF
+     */
+    Scalar freeFlowInterfacePressure(const Element<darcyIdx>& element,
+                                     const SubControlVolumeFace<darcyIdx>& scvf) const
+    {
+        const auto& darcyContext = this->couplingManager().darcyCouplingContext(element, scvf);
+        const auto& freeFlowScvf = darcyContext.getStokesScvf();
+        const auto& freeFlowElemVolVars = darcyContext.elemVolVars;
+
+        using FluxVariables = GetPropType<SubDomainTypeTag<stokesIdx>, Properties::FluxVariables>;
+        FluxVariables fluxVars;
+        return fluxVars.computeMomentumFlux(this->couplingManager().problem(stokesIdx),
+                                            darcyContext.element,
+                                            freeFlowScvf,
+                                            darcyContext.fvGeometry,
+                                            freeFlowElemVolVars,
+                                            darcyContext.elemFaceVars,
+                                            darcyContext.elemFluxVarsCache.gridFluxVarsCache())
+                                            / (freeFlowElemVolVars[freeFlowScvf.insideScvIdx()].extrusionFactor() * freeFlowScvf.area());
+    }
+
+    /*!
+     * \brief Returns the reconstructed free-flow pressure at the coupling interface
+     *        corresponding to the normal momentum flux across the interface, i.e.,
+     *        [p]^PM = [div(vv^T - mu (gradV + gradV^T) + gradp)]^FF
+     */
+    template<class ElementFaceVariables>
+    Scalar darcyInterfaceVelocity(const Element<stokesIdx>& element,
+                                  const FVElementGeometry<stokesIdx>& fvGeometry,
+                                  const ElementVolumeVariables<stokesIdx>& stokesElemVolVars,
+                                  const ElementFaceVariables& stokesElemFaceVars,
+                                  const SubControlVolumeFace<stokesIdx>& scvf) const
+    {
+        const auto& stokesContext = couplingManager_.stokesCouplingContext(element, scvf);
+        const auto darcyPhaseIdx = couplingPhaseIdx(darcyIdx);
+
+        // - p_pm * n_pm = p_pm * n_ff
+        const Scalar darcyPressureCC = stokesContext.volVars.pressure(darcyPhaseIdx);
+
+        using FluxVariables = GetPropType<SubDomainTypeTag<stokesIdx>, Properties::FluxVariables>;
+        FluxVariables fluxVars;
+        const Scalar darcyPressureInterface =  fluxVars.computeMomentumFlux(this->couplingManager().problem(stokesIdx),
+                                            element,
+                                            scvf,
+                                            fvGeometry,
+                                            stokesElemVolVars,
+                                            stokesElemFaceVars,
+                                            this->couplingManager().gridVars_(stokesIdx).gridFluxVarsCache())
+                                            / (stokesElemVolVars[scvf.insideScvIdx()].extrusionFactor() * scvf.area());
+
+
+
+        const Scalar mu = stokesContext.volVars.viscosity(darcyPhaseIdx);
+        const Scalar rho = stokesContext.volVars.density(darcyPhaseIdx);
+        const Scalar distance = (stokesContext.element.geometry().center() - scvf.center()).two_norm();
+        // const Scalar g = -scvf.directionSign() * couplingManager_.problem(darcyIdx).spatialParams().gravity(scvf.center())[scvf.directionIndex()];
+
+
+        const Scalar gradP = (darcyPressureInterface - darcyPressureCC) / distance;
+
+        return -darcyPermeability(element, scvf) / mu * gradP;
+        // const auto& darcyContext = this->couplingManager().darcyCouplingContext(element, scvf);
+        // const auto& freeFlowScvf = darcyContext.getStokesScvf();
+        // const auto& freeFlowElemVolVars = darcyContext.elemVolVars;
+        //
+        // using FluxVariables = GetPropType<SubDomainTypeTag<stokesIdx>, Properties::FluxVariables>;
+        // FluxVariables fluxVars;
+        // return fluxVars.computeMomentumFlux(this->couplingManager().problem(stokesIdx),
+        //                                     darcyContext.element,
+        //                                     freeFlowScvf,
+        //                                     darcyContext.fvGeometry,
+        //                                     freeFlowElemVolVars,
+        //                                     darcyContext.elemFaceVars,
+        //                                     darcyContext.elemFluxVarsCache.gridFluxVarsCache())
+        //                                     / (freeFlowElemVolVars[freeFlowScvf.insideScvIdx()].extrusionFactor() * freeFlowScvf.area());
+    }
+
+    /*!
      * \brief Evaluate an advective flux across the interface and consider upwinding.
      */
     Scalar advectiveFlux(const Scalar insideQuantity, const Scalar outsideQuantity, const Scalar volumeFlow, bool insideIsUpstream) const
@@ -555,7 +635,10 @@ public:
         const auto& darcyContext = this->couplingManager().darcyCouplingContext(element, scvf);
         const Scalar velocity = darcyContext.velocity * scvf.unitOuterNormal();
         const Scalar darcyDensity = darcyElemVolVars[scvf.insideScvIdx()].density(couplingPhaseIdx(darcyIdx));
-        const Scalar stokesDensity = darcyContext.volVars.density();
+
+        const auto& stokesScvf =  darcyContext.getStokesScvf();
+        const Scalar stokesDensity = darcyContext.elemVolVars[stokesScvf.insideScvIdx()].density();
+
         const bool insideIsUpstream = velocity > 0.0;
 
         return massFlux_(velocity, darcyDensity, stokesDensity, insideIsUpstream);
