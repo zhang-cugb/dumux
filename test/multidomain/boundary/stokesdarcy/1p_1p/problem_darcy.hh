@@ -144,7 +144,8 @@ public:
         values.setAllNeumann();
 
         if (couplingManager().isCoupledEntity(CouplingManager::darcyIdx, scvf))
-            values.setAllCouplingNeumann();
+            values.setAllCouplingDirichlet();
+            // values.setAllCouplingNeumann();
 
         if (verticalFlow_)
         {
@@ -165,7 +166,11 @@ public:
      */
     PrimaryVariables dirichlet(const Element &element, const SubControlVolumeFace &scvf) const
     {
-        return initial(element);
+        PrimaryVariables values = initial(element);
+        if (couplingManager().isCoupledEntity(CouplingManager::darcyIdx, scvf))
+            values = couplingManager().couplingData().freeFlowInterfacePressure(element, scvf);
+
+        return values;
     }
 
     /*!

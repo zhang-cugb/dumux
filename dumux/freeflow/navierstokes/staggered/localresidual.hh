@@ -249,7 +249,12 @@ public:
             {
                 // set a fixed value for the velocity for Dirichlet boundary conditions
                 const Scalar velocity = elemFaceVars[scvf].velocitySelf();
-                const Scalar dirichletValue = problem.dirichlet(element, scvf)[Indices::velocity(scvf.directionIndex())];
+                // const Scalar dirichletValue = problem.dirichlet(element, scvf)[Indices::velocity(scvf.directionIndex())];
+                // const Scalar dirichletValue = problem.dirichlet(element, fvGeometry, elemVolVars, elemFaceVars, scvf)[Indices::velocity(scvf.directionIndex())];
+                using CouplingManager = std::decay_t<decltype(problem.couplingManager())>;
+                const Scalar dirichletValue = problem.couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf) ?
+                                              problem.couplingManager().couplingData().darcyInterfaceVelocity(element, fvGeometry, elemVolVars, elemFaceVars, scvf)
+                                             : problem.dirichlet(element, scvf)[Indices::velocity(scvf.directionIndex())];
                 residual = velocity - dirichletValue;
             }
             else if(bcTypes.isSymmetry())

@@ -148,6 +148,10 @@ int main(int argc, char** argv) try
     auto darcyGridVariables = std::make_shared<DarcyGridVariables>(darcyProblem, darcyFvGridGeometry);
     darcyGridVariables->init(sol[darcyIdx]);
 
+    couplingManager->setGridVariables(std::make_tuple(stokesGridVariables->cellCenterGridVariablesPtr(),
+                                                      stokesGridVariables->faceGridVariablesPtr(),
+                                                      darcyGridVariables));
+
     // intialize the vtk output module
     StaggeredVtkOutputModule<StokesGridVariables, decltype(stokesSol)> stokesVtkWriter(*stokesGridVariables, stokesSol, stokesProblem->name());
     GetPropType<StokesTypeTag, Properties::IOFields>::initOutputModule(stokesVtkWriter);
@@ -184,6 +188,45 @@ int main(int argc, char** argv) try
     // write vtk output
     stokesVtkWriter.write(1.0);
     darcyVtkWriter.write(1.0);
+
+    for (const auto& element : elements(darcyGridView))
+    {
+        auto fvGeometry = localView(*darcyFvGridGeometry);
+        fvGeometry.bind(element);
+
+        for (const auto& scvf : scvfs(fvGeometry))
+        {
+            if (couplingManager->isCoupledEntity(CouplingManager::darcyIdx, scvf))
+            {
+                std::cout << "Interface pressure ff at " << scvf.center() << " is " << couplingManager->couplingData().freeFlowInterfacePressure(element, scvf) << std::endl;
+            }
+        }
+    }
+
+    for (const auto& element : elements(stokesGridView))
+    {
+        auto fvGeometry = localView(*stokesFvGridGeometry);
+        auto elemVolVars = localView(stokesGridVariables->cellCenterGridVariablesPtr()->curGridVolVars());
+        auto elemFaceVars = localView(stokesGridVariables->faceGridVariablesPtr()->curGridFaceVars());
+        // auto elemFluxVarsCache = localView(gridVars_(stokesIdx).gridFluxVarsCache());
+
+        fvGeometry.bind(element);
+        elemVolVars.bind(element, fvGeometry, sol[stokesCellCenterIdx]);
+        elemFaceVars.bind(element, fvGeometry, sol[stokesFaceIdx]);
+
+
+        for (const auto& scvf : scvfs(fvGeometry))
+        {
+            if (couplingManager->isCoupledEntity(CouplingManager::stokesIdx, scvf))
+            {
+                std::cout << "Interface pressure pm at " << scvf.center() << " is " << stokesProblem->neumann(element,
+                                    fvGeometry,
+                                    elemVolVars,
+                                    elemFaceVars,
+                                    scvf) << std::endl;
+            }
+        }
+    }
 
     ////////////////////////////////////////////////////////////
     // finalize, print dumux message to say goodbye

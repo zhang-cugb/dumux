@@ -188,8 +188,9 @@ public:
 
         if(couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
         {
-            values.setCouplingNeumann(Indices::conti0EqIdx);
-            values.setCouplingNeumann(Indices::momentumYBalanceIdx);
+            values.setCouplingDirichlet(Indices::velocityYIdx);
+            // values.setCouplingNeumann(Indices::conti0EqIdx);
+            // values.setCouplingNeumann(Indices::momentumYBalanceIdx);
             values.setBJS(Indices::momentumXBalanceIdx);
         }
 
@@ -203,6 +204,30 @@ public:
     {
         return initialAtPos(globalPos);
     }
+
+    // /*!
+    //  * \brief Evaluates the boundary conditions for a Neumann control volume.
+    //  *
+    //  * \param element The element for which the Neumann boundary condition is set
+    //  * \param fvGeometry The fvGeometry
+    //  * \param elemVolVars The element volume variables
+    //  * \param elemFaceVars The element face variables
+    //  * \param scvf The boundary sub control volume face
+    //  */
+    // template<class ElementVolumeVariables, class ElementFaceVariables>
+    // NumEqVector dirichlet(const Element& element,
+    //                     const FVElementGeometry& fvGeometry,
+    //                     const ElementVolumeVariables& elemVolVars,
+    //                     const ElementFaceVariables& elemFaceVars,
+    //                     const SubControlVolumeFace& scvf) const
+    // {
+    //     NumEqVector values(0.0);
+    //
+    //     if(couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
+    //     {
+    //
+    //     }
+    // }
 
     /*!
      * \brief Evaluates the boundary conditions for a Neumann control volume.
@@ -224,8 +249,27 @@ public:
 
         if(couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
         {
+            // std::cout << "vel is " << elemFaceVars[scvf].velocitySelf() << std::endl;
             values[Indices::conti0EqIdx] = couplingManager().couplingData().massCouplingCondition(element, fvGeometry, elemVolVars, elemFaceVars, scvf);
             values[Indices::momentumYBalanceIdx] = couplingManager().couplingData().momentumCouplingCondition(element, fvGeometry, elemVolVars, elemFaceVars, scvf);
+
+            // std::cout << "v self is " << elemFaceVars[scvf].velocitySelf() << ", v darcy " << couplingManager().couplingData().darcyInterfaceVelocity(element, fvGeometry, elemVolVars, elemFaceVars, scvf) << std::endl;
+
+            //
+            // using FluxVariables = GetPropType<TypeTag, Properties::FluxVariables>;
+            // FluxVariables fluxVars;
+            //
+            // const auto& gridFluxVarsCache = couplingManager().gridVars_(CouplingManager::stokesIdx).gridFluxVarsCache();
+            //
+            // std::cout << "p is " <<  fluxVars.computeMomentumFlux(*this,
+            //                                     element,
+            //                                     scvf,
+            //                                     fvGeometry,
+            //                                     elemVolVars,
+            //                                     elemFaceVars,
+            //                                     gridFluxVarsCache) << std::endl;
+
+
         }
         return values;
     }
