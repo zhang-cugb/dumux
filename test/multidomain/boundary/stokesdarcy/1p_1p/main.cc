@@ -198,7 +198,9 @@ int main(int argc, char** argv) try
         {
             if (couplingManager->isCoupledEntity(CouplingManager::darcyIdx, scvf))
             {
-                std::cout << "Interface pressure ff at " << scvf.center() << " is " << couplingManager->couplingData().freeFlowInterfacePressure(element, scvf) << std::endl;
+                std::ostream tmp(std::cout.rdbuf());
+
+                tmp << std::scientific << "Interface pressure ff at " << scvf.center() << " is " << couplingManager->couplingData().freeFlowInterfacePressure(element, scvf) << std::endl;
             }
         }
     }
@@ -219,11 +221,16 @@ int main(int argc, char** argv) try
         {
             if (couplingManager->isCoupledEntity(CouplingManager::stokesIdx, scvf))
             {
-                std::cout << "Interface pressure pm at " << scvf.center() << " is " << stokesProblem->neumann(element,
+                std::ostream tmp(std::cout.rdbuf());
+                tmp << std::scientific << "Interface pressure pm at " << scvf.center() << " is " << stokesProblem->neumann(element,
                                     fvGeometry,
                                     elemVolVars,
                                     elemFaceVars,
-                                    scvf) << std::endl;
+                                    scvf)[scvf.directionIndex()] << ", vself " << elemFaceVars[scvf].velocitySelf() << ", vDarcy " << couplingManager->couplingData().darcyInterfaceVelocity(element,
+                                                                  fvGeometry,
+                                                                  elemVolVars,
+                                                                  elemFaceVars,
+                                                                  scvf)  << std::endl;
             }
         }
     }
