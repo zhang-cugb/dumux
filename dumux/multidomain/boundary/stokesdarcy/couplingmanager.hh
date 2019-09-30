@@ -351,6 +351,32 @@ public:
         }
     }
 
+    //! Pull up the base class' default implementation
+    using ParentType::updateCoupledVariables;
+
+    /*!
+     * \brief Update the porous medium flow domain volume variables and flux variables cache
+     *        after the coupling context has been updated. This has to be done because the
+     *        mechanical deformation enters the porosity/permeability relationships.
+     */
+    template< class LocalAssembler, class UpdatableFluxVarCache >
+    void updateCoupledVariables(Dune::index_constant<darcyIdx> domainI,
+                                const LocalAssembler& localAssembler,
+                                ElementVolumeVariables<darcyIdx>& elemVolVars,
+                                UpdatableFluxVarCache& elemFluxVarsCache)
+    {
+
+        elemVolVars.bind(localAssembler.element(),
+                         localAssembler.fvGeometry(),
+                         this->curSol()[darcyIdx]);
+
+
+        // update the transmissibilities subject to the new permeabilities
+        elemFluxVarsCache.update(localAssembler.element(),
+                                 localAssembler.fvGeometry(),
+                                 elemVolVars);
+    }
+
     /*!
      * \brief Update the coupling context for the Stokes cc residual w.r.t. the Darcy DOFs (FaceToDarcy)
      */
