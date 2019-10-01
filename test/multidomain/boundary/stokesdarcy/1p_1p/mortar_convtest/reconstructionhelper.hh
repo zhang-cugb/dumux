@@ -64,9 +64,9 @@ public:
         coupledMortarElements.reserve(glue.size());
         for (const auto& is : intersections(glue))
         {
-            coupledSdElements.push_back( sdGridGeometry.elementMapper().index(is.inside(0)) );
-            for (unsigned int nIdx = 0; nIdx < is.neighbor(0); ++nIdx)
-                coupledMortarElements.push_back( mortarGridGeometry.elementMapper().index(is.outside(nIdx)) );
+            coupledSdElements.push_back( sdGridGeometry.elementMapper().index(is.domainEntity(0)) );
+            for (unsigned int nIdx = 0; nIdx < is.numTargetNeighbors(); ++nIdx)
+                coupledMortarElements.push_back( mortarGridGeometry.elementMapper().index(is.targetEntity(nIdx)) );
         }
     }
 

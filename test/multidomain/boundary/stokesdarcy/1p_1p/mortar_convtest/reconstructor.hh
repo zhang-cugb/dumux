@@ -102,7 +102,40 @@ public:
                                                 const SolutionVector& sol,
                                                 const ElementScvfIndexMap& map)
     {
-        DUNE_THROW(Dune::NotImplemented, "Stress recovery");
+        // set up vector with interface pressure per cell
+        MortarSolutionVector cellPressure;
+        cellPressure.resize(gridGeometry.gridView().size(0));
+        cellPressure = 0.0;
+
+        for (const auto& element : elements(gridGeometry.gridView()))
+        {
+            auto fvGeometry = localView(gridGeometry);
+            auto elemVolVars = localView(gridVariables.curGridVolVars());
+            auto elemFaceVars = localView(gridVariables.curGridFaceVars());
+
+            fvGeometry.bind(element);
+            elemVolVars.bind(element, fvGeometry, sol);
+            elemFaceVars.bind(element, fvGeometry, sol);
+
+            const auto eIdx = gridGeometry.elementMapper().index(element);
+            if (map.find(eIdx) != map.end())
+                for (auto scvfIdx : map.at(eIdx))
+                {
+                    const auto scvf = fvGeometry.scvf(scvfIdx);
+                    typename SubDomainTraits::FluxVariables fluxVars;
+                    auto stress = fluxVars.computeMomentumFlux(gridVariables.curGridVolVars().problem(),
+                                                               element,
+                                                               scvf,
+                                                               fvGeometry,
+                                                               elemVolVars,
+                                                               elemFaceVars,
+                                                               gridVariables.gridFluxVarsCache());
+                    stress /= (scvf.area()*elemVolVars[scvf.insideScvIdx()].extrusionFactor());
+                    cellPressure[eIdx] = stress;
+                }
+        }
+
+        return cellPressure;
     }
 };
 

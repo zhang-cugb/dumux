@@ -302,6 +302,15 @@ public:
      */
     PrimaryVariables dirichlet(const Element& element, const SubControlVolumeFace& scvf) const
     {
+        if (mortarVariableType_ == OnePMortarVariableType::flux && isOnMortarInterface(scvf.ipGlobal()))
+        {
+            PrimaryVariables values(0.0);
+            const auto eIdx = this->fvGridGeometry().elementMapper().index(element);
+            values[scvf.directionIndex()] = mortarProjection_[eIdx];
+            std::cout << "PROJ: " << mortarProjection_[eIdx] << " vs anal: " << analyticalSolution(scvf.ipGlobal())[scvf.directionIndex()] << std::endl;
+            return values;
+        }
+
         if (!useHomogeneousSetup_)
             return analyticalSolution(scvf.ipGlobal());
         else
@@ -309,17 +318,30 @@ public:
     }
 
     /*!
+     * \brief Define pressure level inside a cell
+     */
+    bool isDirichletCell(const Element& element,
+                         const FVElementGeometry& fvGeometry,
+                         const SubControlVolume& scv,
+                         int pvIdx) const
+    {
+        if (mortarVariableType_ == OnePMortarVariableType::flux
+            && pvIdx == 2 && scv.dofIndex() == this->fvGridGeometry().gridView().size(0)-1)
+                return true;
+        return false;
+
+    }
+
+    /*!
      * \brief Evaluates the pressure boundary conditions for a sub-control volume
      *        touchgin a dirichlet boundary segment.
      */
     PrimaryVariables dirichlet(const Element& element, const SubControlVolume& scv) const
-    {
-        if (!useHomogeneousSetup_)
-            return analyticalSolution(scv.center());
-        else
-            return PrimaryVariables(0.0);
-    }
+    { return analyticalSolution(scv.center()); }
 
+    /*!
+     * \brief Define Dirichlet boundary conditions on a position on a boundary segment.
+     */
     PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
     { return analyticalSolution(globalPos); }
 
@@ -411,19 +433,6 @@ public:
     CellSolutionVector mortarProjection() const
     { return mortarProjection_; }
 
-private:
-    bool onLeftBoundary_(const GlobalPosition &globalPos) const
-    { return globalPos[0] < this->fvGridGeometry().bBoxMin()[0] + eps_; }
-
-    bool onRightBoundary_(const GlobalPosition &globalPos) const
-    { return globalPos[0] > this->fvGridGeometry().bBoxMax()[0] - eps_; }
-
-    bool onLowerBoundary_(const GlobalPosition &globalPos) const
-    { return globalPos[1] < this->fvGridGeometry().bBoxMin()[1] + eps_; }
-
-    bool onUpperBoundary_(const GlobalPosition &globalPos) const
-    { return globalPos[1] > this->fvGridGeometry().bBoxMax()[1] - eps_; }
-
     /*!
     * \brief Return the analytical solution of the problem at a given position
     * \param globalPos The global position
@@ -439,6 +448,19 @@ private:
 
         return values;
     }
+
+private:
+    bool onLeftBoundary_(const GlobalPosition& globalPos) const
+    { return globalPos[0] < this->fvGridGeometry().bBoxMin()[0] + eps_; }
+
+    bool onRightBoundary_(const GlobalPosition& globalPos) const
+    { return globalPos[0] > this->fvGridGeometry().bBoxMax()[0] - eps_; }
+
+    bool onLowerBoundary_(const GlobalPosition& globalPos) const
+    { return globalPos[1] < this->fvGridGeometry().bBoxMin()[1] + eps_; }
+
+    bool onUpperBoundary_(const GlobalPosition &globalPos) const
+    { return globalPos[1] > this->fvGridGeometry().bBoxMax()[1] - eps_; }
 
     Scalar eps_;
     std::string problemName_;
