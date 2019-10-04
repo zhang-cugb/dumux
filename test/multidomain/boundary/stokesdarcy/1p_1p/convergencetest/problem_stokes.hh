@@ -164,8 +164,9 @@ public:
 
         if (couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
         {
-            values.setCouplingNeumann(Indices::conti0EqIdx);
-            values.setCouplingNeumann(Indices::momentumYBalanceIdx);
+            // values.setCouplingNeumann(Indices::conti0EqIdx);
+            // values.setCouplingNeumann(Indices::momentumYBalanceIdx);
+            values.setCouplingDirichlet(Indices::velocityYIdx);
             values.setBJS(Indices::momentumXBalanceIdx);
         }
 
@@ -184,6 +185,22 @@ public:
         values[1] = v[1];
         values[2] = p;
         return values;
+    }
+
+    /*!
+     * \brief Returns whether a fixed Dirichlet value shall be used at a given cell.
+     *
+     * \param element The finite element
+     * \param fvGeometry The finite-volume geometry
+     * \param scv The sub control volume
+     * \param pvIdx The primary variable index in the solution vector
+     */
+    bool isDirichletCell(const Element& element,
+                         const typename FVGridGeometry::LocalView& fvGeometry,
+                         const typename FVGridGeometry::SubControlVolume& scv,
+                         int pvIdx) const
+    {
+        return scv.dofIndex() == 0;
     }
 
     /*!

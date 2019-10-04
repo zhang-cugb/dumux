@@ -141,7 +141,7 @@ public:
         BoundaryTypes values;
 
         if (couplingManager().isCoupledEntity(CouplingManager::darcyIdx, scvf))
-            values.setAllCouplingNeumann();
+            values.setAllCouplingDirichlet();
         else
             values.setAllDirichlet();
 
@@ -158,7 +158,10 @@ public:
      */
     PrimaryVariables dirichlet(const Element &element, const SubControlVolumeFace &scvf) const
     {
-        return PrimaryVariables(exactPressure(scvf.center()));
+        if (couplingManager().isCoupledEntity(CouplingManager::darcyIdx, scvf))
+            return couplingManager().couplingData().freeFlowInterfacePressure(element, scvf);
+        else
+            return PrimaryVariables(exactPressure(scvf.center()));
     }
 
     /*!

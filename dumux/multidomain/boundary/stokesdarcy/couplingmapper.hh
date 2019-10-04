@@ -140,7 +140,22 @@ public:
                 stokesCellCenterToDarcyStencils[stokesElementIdx].push_back(darcyDofIdx);
 
                 darcyToStokesFaceStencils[darcyElementIdx[0]].push_back(scvf.dofIndex());
+
+                // get the list of face dofs that have an influence on the resdiual of the current face
+                const auto& connectivityMap = stokesFvGridGeometry.connectivityMap();
+
+                static constexpr auto cellCenterId = typename Dune::index_constant<0>();
+                static constexpr auto faceId = typename Dune::index_constant<1>();
+
+                // evaluate derivatives w.r.t. all other related face dofs
+                for (const auto& globalJ : connectivityMap(faceId, faceId, scvf.index()))
+                   darcyToStokesFaceStencils[darcyElementIdx[0]].push_back(globalJ);
+
+
                 darcyToStokesCellCenterStencils[darcyElementIdx[0]].push_back(stokesElementIdx);
+                // evaluate derivatives w.r.t. all other related face dofs
+                for (const auto& globalJ : connectivityMap(faceId, cellCenterId, scvf.index()))
+                   darcyToStokesCellCenterStencils[darcyElementIdx[0]].push_back(globalJ);
 
                 const auto& darcyElement = darcyFvGridGeometry.element(darcyElementIdx[0]);
                 darcyFvGeometry.bindElement(darcyElement);
