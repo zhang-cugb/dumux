@@ -1,6 +1,10 @@
 [Problem]
 EnableGravity = false
 
+[AnalyticSolution]
+Alpha = 25
+Beta = 0.1
+
 [SpatialParams]
 Permeability = 1 # m^2
 AlphaBeaversJoseph = 1.0

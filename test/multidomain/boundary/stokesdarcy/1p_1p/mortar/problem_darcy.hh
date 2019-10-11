@@ -120,6 +120,8 @@ public:
     , eps_(1e-7)
     , isOnNegativeMortarSide_(getParamFromGroup<bool>(paramGroup, "Problem.IsOnNegativeMortarSide"))
     , useHomogeneousSetup_(false)
+    , beta_(getParam<Scalar>("AnalyticSolution.Beta"))
+    , alpha_(getParam<Scalar>("AnalyticSolution.Alpha"))
     {
         const auto mv = getParamFromGroup<std::string>("Mortar", "VariableType");
         mortarVariableType_ = mv == "Pressure" ? OnePMortarVariableType::pressure : OnePMortarVariableType::flux;
@@ -214,13 +216,12 @@ public:
      */
     NumEqVector exact(const GlobalPosition& globalPos) const
     {
-        using std::sin;
-        using std::cos;
+        using std::exp;
 
         const auto x = globalPos[0];
         const auto y = globalPos[1];
 
-        return NumEqVector( y*y*(1.0 - 1.0/3.0*y) + x*(1.0-x)*y*sin(2.0*M_PI*x) );
+        return NumEqVector( (1.0 + beta_*(x - 0.5)) / (1.0 + exp(-alpha_*(y-1.0))) );
     }
 
     /*!
@@ -228,15 +229,24 @@ public:
      */
     GlobalPosition exactFlux(const GlobalPosition& globalPos) const
     {
-        using std::sin;
-        using std::cos;
+        using std::exp;
+        using std::pow;
 
         const auto x = globalPos[0];
         const auto y = globalPos[1];
+
         const auto& k = this->spatialParams().permeabilityAtPos(globalPos);
+        if (k < 0.999 || k > 1.111)
+            DUNE_THROW(Dune::InvalidStateException, "This expects K = 1!");
 
         static const Scalar mu = getParam<Scalar>("0.Component.LiquidKinematicViscosity");
-        return GlobalPosition( {-1.0*k/mu*(y*((1.0-2.0*x)*sin(2.0*x*M_PI) - 2.0*M_PI*(x-1.0)*x*cos(2.0*M_PI*x))), -1.0*k/mu*(-(x-1.0)*x*sin(2*M_PI*x) - (y-2.0)*y)} );
+        if (mu < 0.999 || mu > 1.111)
+            DUNE_THROW(Dune::InvalidStateException, "This expects mu = 1!");
+
+        const Scalar exponent = -alpha_*(y-1.0);
+
+        return GlobalPosition( {-beta_/(1.0+exp(exponent)),
+                                -(1.0+beta_*(x-0.5))*alpha_*exp(exponent)/(1.0+exp(exponent))/(1.0+exp(exponent))} );
     }
 
     /*!
@@ -246,16 +256,31 @@ public:
     {
         if (!useHomogeneousSetup_)
         {
-            using std::sin;
-            using std::cos;
+            using std::exp;
 
             const auto x = globalPos[0];
             const auto y = globalPos[1];
+
             const auto& k = this->spatialParams().permeabilityAtPos(globalPos);
+            if (k < 0.999 || k > 1.111)
+                DUNE_THROW(Dune::InvalidStateException, "This expects K = 1!");
 
             static const Scalar rho = getParam<Scalar>("0.Component.LiquidDensity");
+            if (rho < 0.999 || rho > 1.111)
+                DUNE_THROW(Dune::InvalidStateException, "This expects rho = 1!");
+
             static const Scalar mu = getParam<Scalar>("0.Component.LiquidKinematicViscosity");
-            return NumEqVector( 2.0*k*rho/mu*( (y - 2.0*M_PI*M_PI*(x-1.0)*x*y)*sin(2.0*M_PI*x) +2.0*M_PI*(2.0*x-1.0)*y*cos(2.0*M_PI*x) + y - 1.0) );
+            if (mu < 0.999 || mu > 1.111)
+                DUNE_THROW(Dune::InvalidStateException, "This expects mu = 1!");
+
+            const auto exponent = -alpha_*(y-1.0);
+            const auto eExp = exp(exponent);
+
+            auto source = -(1.0 + beta_*(x - 0.5))*alpha_*alpha_;
+            source *= eExp;
+            source *= -1.0/(1.0 + eExp)/(1.0 + eExp) + 2.0*eExp/(1.0+eExp)/(1.0+eExp)/(1.0+eExp);
+
+            return NumEqVector( source );
         }
 
         return NumEqVector(0.0);
@@ -395,6 +420,10 @@ private:
 
     bool isOnNegativeMortarSide_;
     bool useHomogeneousSetup_;
+
+    Scalar alpha_;
+    Scalar beta_;
+
     OnePMortarVariableType mortarVariableType_;
 };
 
