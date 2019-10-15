@@ -221,7 +221,11 @@ public:
         const auto x = globalPos[0];
         const auto y = globalPos[1];
 
-        return NumEqVector( (1.0 + beta_*(x - 0.5)) / (1.0 + exp(-alpha_*(y-1.0))) );
+        static const bool useSteepPressureSolution = getParam<bool>("Problem.UseSteepPressureSolution");
+        if (!useSteepPressureSolution)
+            return NumEqVector( (1.0 + beta_*(x - 0.5)) / (1.0 + exp(-alpha_*(y-1.0))) );
+        else
+            return NumEqVector( 1.0/(1.0 + exp(-alpha_*(y-1.0)) + exp(-beta_*(x-0.5))) );
     }
 
     /*!
@@ -243,10 +247,21 @@ public:
         if (mu < 0.999 || mu > 1.111)
             DUNE_THROW(Dune::InvalidStateException, "This expects mu = 1!");
 
-        const Scalar exponent = -alpha_*(y-1.0);
-
-        return GlobalPosition( {-beta_/(1.0+exp(exponent)),
-                                -(1.0+beta_*(x-0.5))*alpha_*exp(exponent)/(1.0+exp(exponent))/(1.0+exp(exponent))} );
+        static const bool useSteepPressureSolution = getParam<bool>("Problem.UseSteepPressureSolution");
+        if (!useSteepPressureSolution)
+        {
+            const Scalar exponent = -alpha_*(y-1.0);
+            return GlobalPosition( {-beta_/(1.0+exp(exponent)),
+                                    -(1.0+beta_*(x-0.5))*alpha_*exp(exponent)/(1.0+exp(exponent))/(1.0+exp(exponent))} );
+        }
+        else
+        {
+            GlobalPosition v;
+            v[0] = 1.0*beta_*exp(-beta_*(x - 0.5)) / pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1)), 2);
+            v[1] = 1.0*alpha_*exp(-alpha_*(y - 1)) / pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1)), 2);
+            v *= -1.0;
+            return v;
+        }
     }
 
     /*!
@@ -257,6 +272,7 @@ public:
         if (!useHomogeneousSetup_)
         {
             using std::exp;
+            using std::pow;
 
             const auto x = globalPos[0];
             const auto y = globalPos[1];
@@ -276,11 +292,19 @@ public:
             const auto exponent = -alpha_*(y-1.0);
             const auto eExp = exp(exponent);
 
-            auto source = -(1.0 + beta_*(x - 0.5))*alpha_*alpha_;
-            source *= eExp;
-            source *= -1.0/(1.0 + eExp)/(1.0 + eExp) + 2.0*eExp/(1.0+eExp)/(1.0+eExp)/(1.0+eExp);
-
-            return NumEqVector( source );
+            static const bool useSteepPressureSolution = getParam<bool>("Problem.UseSteepPressureSolution");
+            if (!useSteepPressureSolution)
+            {
+                auto source = -(1.0 + beta_*(x - 0.5))*alpha_*alpha_;
+                source *= eExp;
+                source *= -1.0/(1.0 + eExp)/(1.0 + eExp) + 2.0*eExp/(1.0+eExp)/(1.0+eExp)/(1.0+eExp);
+                return NumEqVector( source );
+            }
+            else // computed with sympy
+                return NumEqVector( 1.0*alpha_*alpha_*exp(-alpha_*(y - 1.0))/pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1)), 2)
+                                    - 2.0*alpha_*alpha_*exp(-2.0*alpha_*(y - 1.0))/pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1)), 3)
+                                    + 1.0*beta_*beta_*exp(-beta_*(x - 0.5))/pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1.0)), 2)
+                                    - 2.0*beta_*beta_*exp(-2*beta_*(x - 0.5))/pow(1.0 + exp(-beta_*(x - 0.5)) + exp(-alpha_*(y - 1.0)), 3) );
         }
 
         return NumEqVector(0.0);
