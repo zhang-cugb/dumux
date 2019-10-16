@@ -39,7 +39,7 @@
 #include "facevariables.hh"
 #include "boundarytypes.hh"
 #include "velocityoutput.hh"
-#include <mydumux/discretization/staggered/freeflow/fvgridgeometrytraits.hh>
+#include <dumux/discretization/staggered/freeflow/fvgridgeometrytraits1.hh>
 #include "gridvolumevariables.hh"
 
 namespace Dumux {
@@ -84,7 +84,7 @@ private:
     static constexpr auto upwindSchemeOrder = getPropValue<TypeTag, Properties::UpwindSchemeOrder>();
     static constexpr bool enableCache = getPropValue<TypeTag, Properties::EnableFVGridGeometryCache>();
     using GridView = GetPropType<TypeTag, Properties::GridView>;
-    using Traits = StaggeredFreeFlowDefaultFVGridGeometryTraits<GridView, upwindSchemeOrder>;
+    using Traits = MyStaggeredFreeFlowDefaultFVGridGeometryTraits<GridView, upwindSchemeOrder>;
 public:
     using type = StaggeredFVGridGeometry<GridView, enableCache, Traits>;
 };
