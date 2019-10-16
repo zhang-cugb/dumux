@@ -28,7 +28,7 @@
 #include <dumux/discretization/localview.hh>
 #include <dumux/discretization/staggered/elementfluxvariablescache.hh>
 
-#include <mydumux/freeflow/higherorderapproximation.hh>
+#include <dumux/freeflow/higherorderapproximation.hh>
 
 namespace Dumux {
 
@@ -128,8 +128,8 @@ public:
         }
     }
 
-    //! Return the HigherOrderApproximation
-    const HigherOrderApproximation<Scalar>& higherOrderApproximation() const
+    //! Return the MyHigherOrderApproximation
+    const MyHigherOrderApproximation<Scalar>& higherOrderApproximation() const
     {
         return higherOrderApproximation_;
     }
@@ -146,7 +146,7 @@ public:
 
 private:
     const Problem* problemPtr_;
-    HigherOrderApproximation<Scalar> higherOrderApproximation_;
+    MyHigherOrderApproximation<Scalar> higherOrderApproximation_;
 
     std::vector<FluxVariablesCache> fluxVarsCache_;
     std::vector<std::size_t> globalScvfIndices_;
@@ -197,14 +197,14 @@ public:
     { return *problemPtr_; }
 
     //! Return the UpwindingMethods
-    const HigherOrderApproximation<Scalar>& higherOrderApproximation() const
+    const MyHigherOrderApproximation<Scalar>& higherOrderApproximation() const
     {
         return higherOrderApproximation_;
     }
 
 private:
     const Problem* problemPtr_;
-    HigherOrderApproximation<Scalar> higherOrderApproximation_;
+    MyHigherOrderApproximation<Scalar> higherOrderApproximation_;
 
 };
 
