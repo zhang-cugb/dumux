@@ -55,7 +55,7 @@
 #include <dumux/freeflow/nonisothermal/iofields.hh>
 
 #include "localresidual.hh"
-#include <mydumux/freeflow/navierstokes/volumevariables.hh>
+#include <dumux/freeflow/navierstokes/volumevariables.hh>
 #include "fluxvariables.hh"
 #include "indices.hh"
 #include "iofields.hh"
@@ -200,7 +200,7 @@ private:
 
     using Traits = NavierStokesVolumeVariablesTraits<PV, FSY, FST, MT>;
 public:
-    using type = NavierStokesVolumeVariables<Traits>;
+    using type = MyNavierStokesVolumeVariables<Traits>;
 };
 
 //! The flux variables
