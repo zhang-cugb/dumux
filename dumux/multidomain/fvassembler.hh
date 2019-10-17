@@ -41,7 +41,7 @@
 #include "couplingjacobianpattern.hh"
 #include "subdomaincclocalassembler.hh"
 #include "subdomainboxlocalassembler.hh"
-#include "subdomainstaggeredlocalassembler.hh"
+#include <dumux/multidomain/subdomainstaggeredlocalassembler.hh>
 
 namespace Dumux {
 
@@ -123,7 +123,7 @@ private:
     template<std::size_t id>
     struct SubDomainAssemblerType<DiscretizationMethod::staggered, id>
     {
-        using type = SubDomainStaggeredLocalAssembler<id, SubDomainTypeTag<id>, ThisType, diffMethod, isImplicit()>;
+        using type = MySubDomainStaggeredLocalAssembler<id, SubDomainTypeTag<id>, ThisType, diffMethod, isImplicit()>;
     };
 
     template<std::size_t id>
@@ -397,6 +397,27 @@ public:
     { return LocalResidual<i>(std::get<domainId>(problemTuple_).get(), timeLoop_.get()); }
 
 protected:
+    // get diagonal block pattern
+    template<std::size_t i, std::size_t j, typename std::enable_if_t<(i==j), int> = 0>
+    Dune::MatrixIndexSet getJacobianPattern_(Dune::index_constant<i> domainI,
+                                             Dune::index_constant<j> domainJ) const
+    {
+        const auto& gg = fvGridGeometry(domainI);
+        auto pattern = getJacobianPattern<isImplicit()>(gg);
+        couplingManager_->extendJacobianPattern(domainI, pattern);
+        return pattern;
+    }
+
+    // get coupling block pattern
+    template<std::size_t i, std::size_t j, typename std::enable_if_t<(i!=j), int> = 0>
+    Dune::MatrixIndexSet getJacobianPattern_(Dune::index_constant<i> domainI,
+                                             Dune::index_constant<j> domainJ) const
+    {
+        return getCouplingJacobianPattern<isImplicit()>(*couplingManager_,
+                                                        domainI, fvGridGeometry(domainI),
+                                                        domainJ, fvGridGeometry(domainJ));
+    }
+
     //! the coupling manager coupling the sub domains
     std::shared_ptr<CouplingManager> couplingManager_;
 
@@ -471,27 +492,6 @@ private:
         // let the local assembler add the element contributions
         for (const auto& element : elements(gridView(domainId)))
             assembleElement(element);
-    }
-
-    // get diagonal block pattern
-    template<std::size_t i, std::size_t j, typename std::enable_if_t<(i==j), int> = 0>
-    Dune::MatrixIndexSet getJacobianPattern_(Dune::index_constant<i> domainI,
-                                             Dune::index_constant<j> domainJ) const
-    {
-        const auto& gg = fvGridGeometry(domainI);
-        auto pattern = getJacobianPattern<isImplicit()>(gg);
-        couplingManager_->extendJacobianPattern(domainI, pattern);
-        return pattern;
-    }
-
-    // get coupling block pattern
-    template<std::size_t i, std::size_t j, typename std::enable_if_t<(i!=j), int> = 0>
-    Dune::MatrixIndexSet getJacobianPattern_(Dune::index_constant<i> domainI,
-                                             Dune::index_constant<j> domainJ) const
-    {
-        return getCouplingJacobianPattern<isImplicit()>(*couplingManager_,
-                                                        domainI, fvGridGeometry(domainI),
-                                                        domainJ, fvGridGeometry(domainJ));
     }
 
     //! pointer to the problem to be solved
