@@ -26,13 +26,13 @@
 
 #include <dumux/common/properties.hh>
 #include <dumux/discretization/method.hh>
-#include <mydumux/freeflow/navierstokes/staggered/fluxvariables.hh>
+#include <dumux/freeflow/navierstokes/staggered/fluxvariables.hh>
 
 namespace Dumux {
 
 // forward declaration
 template<class TypeTag, DiscretizationMethod discMethod>
-class NavierStokesFluxVariablesImpl;
+class MyNavierStokesFluxVariablesImpl;
 
 /*!
  * \ingroup NavierStokesModel
@@ -42,7 +42,7 @@ class NavierStokesFluxVariablesImpl;
  * \note  Not all specializations are currently implemented
  */
 template<class TypeTag>
-using NavierStokesFluxVariables = NavierStokesFluxVariablesImpl<TypeTag, GetPropType<TypeTag, Properties::FVGridGeometry>::discMethod>;
+using NavierStokesFluxVariables = MyNavierStokesFluxVariablesImpl<TypeTag, GetPropType<TypeTag, Properties::FVGridGeometry>::discMethod>;
 
 
 } // end namespace
