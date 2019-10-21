@@ -128,8 +128,8 @@ public:
         }
     }
 
-    //! Return the MyStaggeredUpwindMethods
-    const MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
+    //! Return the StaggeredUpwindMethods
+    const StaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
     {
         return staggeredUpwindMethods_;
     }
@@ -146,7 +146,7 @@ public:
 
 private:
     const Problem* problemPtr_;
-    MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
+    StaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
 
     std::vector<FluxVariablesCache> fluxVarsCache_;
     std::vector<std::size_t> globalScvfIndices_;
@@ -197,14 +197,14 @@ public:
     { return *problemPtr_; }
 
     //! Return the UpwindingMethods
-    const MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
+    const StaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
     {
         return staggeredUpwindMethods_;
     }
 
 private:
     const Problem* problemPtr_;
-    MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
+    StaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
 
 };
 
