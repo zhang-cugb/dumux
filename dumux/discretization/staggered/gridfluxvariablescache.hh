@@ -28,7 +28,7 @@
 #include <dumux/discretization/localview.hh>
 #include <dumux/discretization/staggered/elementfluxvariablescache.hh>
 
-#include <dumux/freeflow/higherorderapproximation.hh>
+#include <dumux/freeflow/staggeredupwindmethods.hh>
 
 namespace Dumux {
 
@@ -93,7 +93,7 @@ public:
 
     StaggeredGridFluxVariablesCache(const Problem& problem, const std::string& paramGroup = "")
     : problemPtr_(&problem)
-    , higherOrderApproximation_(paramGroup)
+    , staggeredUpwindMethods_(paramGroup)
     {}
 
     // When global caching is enabled, precompute transmissibilities and stencils for all the scv faces
@@ -128,10 +128,10 @@ public:
         }
     }
 
-    //! Return the MyHigherOrderApproximation
-    const MyHigherOrderApproximation<Scalar>& higherOrderApproximation() const
+    //! Return the MyStaggeredUpwindMethods
+    const MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
     {
-        return higherOrderApproximation_;
+        return staggeredUpwindMethods_;
     }
 
     const Problem& problem() const
@@ -146,7 +146,7 @@ public:
 
 private:
     const Problem* problemPtr_;
-    MyHigherOrderApproximation<Scalar> higherOrderApproximation_;
+    MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
 
     std::vector<FluxVariablesCache> fluxVarsCache_;
     std::vector<std::size_t> globalScvfIndices_;
@@ -183,7 +183,7 @@ public:
 
     StaggeredGridFluxVariablesCache(const Problem& problem, const std::string& paramGroup = "")
     : problemPtr_(&problem)
-    , higherOrderApproximation_(paramGroup)
+    , staggeredUpwindMethods_(paramGroup)
       {}
 
     // When global caching is enabled, precompute transmissibilities and stencils for all the scv faces
@@ -197,14 +197,14 @@ public:
     { return *problemPtr_; }
 
     //! Return the UpwindingMethods
-    const MyHigherOrderApproximation<Scalar>& higherOrderApproximation() const
+    const MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder>& staggeredUpwindMethods() const
     {
-        return higherOrderApproximation_;
+        return staggeredUpwindMethods_;
     }
 
 private:
     const Problem* problemPtr_;
-    MyHigherOrderApproximation<Scalar> higherOrderApproximation_;
+    MyStaggeredUpwindMethods<Scalar, upwindSchemeOrder> staggeredUpwindMethods_;
 
 };
 
