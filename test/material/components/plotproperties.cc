@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
 
     if (compName == "Air")
         plotStuff< Components::Air<double> >(openPlotWindow);
-    if (compName == "Ammonia")
+    else if (compName == "Ammonia")
         plotStuff< Components::Ammonia<double> >(openPlotWindow);
     else if (compName == "Benzene")
         plotStuff< Components::Benzene<double> >(openPlotWindow);
