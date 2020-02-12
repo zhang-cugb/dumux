@@ -113,13 +113,13 @@ public:
 
         // effective diffusion coefficients
         Scalar insideCoeff_k = insideVolVars.kinematicViscosity()
-                                + ( insideVolVars.sigmaK() * insideVolVars.turbulentKineticEnergy() / insideVolVars.dissipation() );
+                                + ( problem.sigmaK() * insideVolVars.turbulentKineticEnergy() / insideVolVars.dissipation() );
         Scalar outsideCoeff_k = outsideVolVars.kinematicViscosity()
-                                + ( outsideVolVars.sigmaK() * outsideVolVars.turbulentKineticEnergy() / outsideVolVars.dissipation() );
+                                + ( problem.sigmaK() * outsideVolVars.turbulentKineticEnergy() / outsideVolVars.dissipation() );
         Scalar insideCoeff_w = insideVolVars.kinematicViscosity()
-                                + ( insideVolVars.sigmaOmega() * insideVolVars.turbulentKineticEnergy() / insideVolVars.dissipation() );
+                                + ( problem.sigmaOmega() * insideVolVars.turbulentKineticEnergy() / insideVolVars.dissipation() );
         Scalar outsideCoeff_w = outsideVolVars.kinematicViscosity()
-                                + ( outsideVolVars.sigmaOmega() * outsideVolVars.turbulentKineticEnergy() / outsideVolVars.dissipation() );
+                                + ( problem.sigmaOmega() * outsideVolVars.turbulentKineticEnergy() / outsideVolVars.dissipation() );
 
         // scale by extrusion factor
         insideCoeff_k *= insideVolVars.extrusionFactor();

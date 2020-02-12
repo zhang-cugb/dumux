@@ -108,15 +108,15 @@ public:
         Scalar productionTerm = 2.0 * volVars.kinematicEddyViscosity() * volVars.stressTensorScalarProduct();
         if (enableKOmegaProductionLimiter)
         {
-            Scalar productionAlternative = 20.0 * volVars.betaK() * volVars.turbulentKineticEnergy() * volVars.dissipation();
+            Scalar productionAlternative = 20.0 * problem.betaK() * volVars.turbulentKineticEnergy() * volVars.dissipation();
             productionTerm = min(productionTerm, productionAlternative);
         }
         source[turbulentKineticEnergyEqIdx] += productionTerm;
-        source[dissipationEqIdx] += volVars.alpha() * volVars.dissipation() / volVars.turbulentKineticEnergy() * productionTerm;
+        source[dissipationEqIdx] += problem.alpha() * volVars.dissipation() / volVars.turbulentKineticEnergy() * productionTerm;
 
         // destruction
-        source[turbulentKineticEnergyEqIdx] -= volVars.betaK() * volVars.turbulentKineticEnergy() * volVars.dissipation();
-        source[dissipationEqIdx] -= volVars.betaOmega() * volVars.dissipation() * volVars.dissipation();
+        source[turbulentKineticEnergyEqIdx] -= problem.betaK() * volVars.turbulentKineticEnergy() * volVars.dissipation();
+        source[dissipationEqIdx] -= problem.betaOmega() * volVars.dissipation() * volVars.dissipation();
 
         // cross-diffusion term
         Scalar gradientProduct = 0.0;

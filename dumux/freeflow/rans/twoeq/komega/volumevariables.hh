@@ -83,7 +83,7 @@ public:
                               const SubControlVolume& scv)
     {
         RANSParentType::updateRANSProperties(elemSol, problem, element, scv);
-        betaOmega_ = problem.betaOmega();
+        betaK_ = problem.betaK();
         turbulentKineticEnergy_ = elemSol[0][Indices::turbulentKineticEnergyIdx];
         dissipation_ = elemSol[0][Indices::dissipationIdx];
         storedDissipation_ = problem.storedDissipation_[RANSParentType::elementIdx()];
@@ -176,28 +176,12 @@ public:
         return stressTensorScalarProduct_;
     }
 
-    //! \brief Returns the \f$ \alpha \f$ value
-    const Scalar alpha() const
-    { return 0.52; }
-
-    //! \brief Returns the \f$ \sigma_k \f$ constant
-    const Scalar sigmaK() const
-    { return 0.6; }
-
-    //! \brief Returns the \f$ \sigma_{\omega} \f$ constant
-    const Scalar sigmaOmega() const
-    { return 0.5; }
-
-    //! \brief Returns the \f$ \beta_k \f$ constant
-    const Scalar betaK() const
-    { return 0.09; }
-
     //! \brief Returns the \f$ \beta_\omega \f$ constant
-    const Scalar betaOmega() const
-    { return betaOmega_; }
+    const Scalar betaK() const
+    { return betaK_; }
 
 protected:
-    Scalar betaOmega_ = 0.0;
+    Scalar betaK_ = 0.0;
     Scalar dissipation_ = 0.0;
     Scalar turbulentKineticEnergy_ = 0.0;
     Scalar storedDissipation_ = 0.0;

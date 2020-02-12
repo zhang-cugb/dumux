@@ -139,10 +139,23 @@ public:
 
     //! \brief Returns the \f$ \beta_{\omega} \f$ constant
     const Scalar betaOmega() const
-    {
-        return 0.0708;
-    }
+    { return 0.0708; }
 
+    //! \brief Returns the \f$ \alpha \f$ value
+    const Scalar alpha() const
+    { return 0.52; }
+
+    //! \brief Returns the \f$ \sigma_k \f$ constant
+    const Scalar sigmaK() const
+    { return 0.6; }
+
+    //! \brief Returns the \f$ \sigma_{\omega} \f$ constant
+    const Scalar sigmaOmega() const
+    { return 0.5; }
+
+    //! \brief Returns the \f$ \beta_k \f$ constant
+    const Scalar betaK() const
+    { return 0.09; }
 public:
     std::vector<Scalar> storedDynamicEddyViscosity_;
     std::vector<Scalar> storedDissipation_;
