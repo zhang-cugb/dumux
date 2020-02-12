@@ -47,6 +47,7 @@
 #include <dumux/nonlinear/newtonsolver.hh>
 #include <dumux/discretization/method.hh>
 
+#include "l2error.hh"
 #include "problem.hh"
 
 /*!
@@ -75,9 +76,14 @@ void usage(const char *progName, const std::string &errorMsg)
 * \param time the time at which to evaluate the analytical solution
 * \param problem the problem for which to evaluate the analytical solution
 */
-template<class Scalar, class Problem>
-auto createAnalyticalSolution(const Scalar time, const Problem& problem)
+template<class Problem>
+auto createAnalyticalSolution(const Problem& problem)
 {
+    using namespace Dumux;
+    using TypeTag = Properties::TTag::TYPETAG;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+    using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
+
     const auto& gridGeometry = problem.gridGeometry();
     using GridView = typename std::decay_t<decltype(gridGeometry)>::GridView;
 
@@ -98,7 +104,6 @@ auto createAnalyticalSolution(const Scalar time, const Problem& problem)
     analyticalVelocity.resize(gridGeometry.numCellCenterDofs());
     analyticalVelocityOnFace.resize(gridGeometry.numFaceDofs());
 
-    using Indices = typename Problem::Indices;
     for (const auto& element : elements(gridGeometry.gridView()))
     {
         auto fvGeometry = localView(gridGeometry);
@@ -107,7 +112,7 @@ auto createAnalyticalSolution(const Scalar time, const Problem& problem)
         {
             auto ccDofIdx = scv.dofIndex();
             auto ccDofPosition = scv.dofPosition();
-            auto analyticalSolutionAtCc = problem.analyticalSolution(ccDofPosition, time);
+            auto analyticalSolutionAtCc = problem.analyticalSolutionAtPos(ccDofPosition);
 
             // velocities on faces
             for (auto&& scvf : scvfs(fvGeometry))
@@ -115,7 +120,7 @@ auto createAnalyticalSolution(const Scalar time, const Problem& problem)
                 const auto faceDofIdx = scvf.dofIndex();
                 const auto faceDofPosition = scvf.center();
                 const auto dirIdx = scvf.directionIndex();
-                const auto analyticalSolutionAtFace = problem.analyticalSolution(faceDofPosition, time);
+                const auto analyticalSolutionAtFace = problem.analyticalSolutionAtPos(faceDofPosition);
                 analyticalVelocityOnFace[faceDofIdx][dirIdx] = analyticalSolutionAtFace[Indices::velocity(dirIdx)];
             }
 
@@ -129,6 +134,41 @@ auto createAnalyticalSolution(const Scalar time, const Problem& problem)
     }
 
     return std::make_tuple(analyticalPressure, analyticalTurbulentKineticEnergy, analyticalDissipation, analyticalVelocity, analyticalVelocityOnFace);
+}
+
+template<class Problem, class SolutionVector, class GridGeometry>
+void printL2Error(const Problem& problem, const SolutionVector& x, const GridGeometry& gridGeometry)
+{
+    using namespace Dumux;
+    using TypeTag = Properties::TTag::TYPETAG;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+    using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
+    using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
+    using PrimaryVariables = GetPropType<TypeTag, Properties::PrimaryVariables>;
+
+    using L2Error = NavierStokesTestL2Error<Scalar, ModelTraits, PrimaryVariables>;
+    const auto l2error = L2Error::calculateL2Error(*problem, x);
+    const int numCellCenterDofs = gridGeometry->numCellCenterDofs();
+    const int numFaceDofs = gridGeometry->numFaceDofs();
+    std::cout << std::setprecision(8) << "** L2 error (abs/rel) for "
+            << std::setw(6) << numCellCenterDofs << " cc dofs and " << numFaceDofs << " face dofs (total: " << numCellCenterDofs + numFaceDofs << "): "
+            << std::scientific
+            << "L2(p) = " << l2error.first[Indices::pressureIdx] << " / " << l2error.second[Indices::pressureIdx]
+            << ", L2(vx) = " << l2error.first[Indices::velocityXIdx] << " / " << l2error.second[Indices::velocityXIdx]
+            << ", L2(vy) = " << l2error.first[Indices::velocityYIdx] << " / " << l2error.second[Indices::velocityYIdx]
+            << ", L2(k) = " << l2error.first[Indices::turbulentKineticEnergyIdx] << " / " << l2error.second[Indices::turbulentKineticEnergyIdx]
+            << ", L2(w) = " << l2error.first[Indices::dissipationIdx] << " / " << l2error.second[Indices::dissipationIdx]
+            << std::endl;
+
+    // write the norm into a log file
+    std::ofstream logFile;
+    logFile.open(problem->name() + ".log", std::ios::app);
+    logFile << "[ConvergenceTest] L2(p) = "
+            << l2error.first[Indices::pressureIdx]
+            << " L2(vx) = " << l2error.first[Indices::velocityXIdx]
+            << " L2(vy) = " << l2error.first[Indices::velocityYIdx]
+            << std::endl;
+    logFile.close();
 }
 
 int main(int argc, char** argv) try
@@ -152,10 +192,6 @@ int main(int argc, char** argv) try
     GridManager<GetPropType<TypeTag, Properties::Grid>> gridManager;
     gridManager.init();
 
-    ////////////////////////////////////////////////////////////
-    // run instationary non-linear problem on this grid
-    ////////////////////////////////////////////////////////////
-
     // we compute on the leaf grid view
     const auto& leafGridView = gridManager.grid().leafGridView();
 
@@ -168,17 +204,6 @@ int main(int argc, char** argv) try
     using Problem = GetPropType<TypeTag, Properties::Problem>;
     auto problem = std::make_shared<Problem>(gridGeometry);
 
-    // get some time loop parameters
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    const auto tEnd = getParam<Scalar>("TimeLoop.TEnd");
-    const auto maxDt = getParam<Scalar>("TimeLoop.MaxTimeStepSize");
-    auto dt = getParam<Scalar>("TimeLoop.DtInitial");
-
-    // instantiate time loop
-    auto timeLoop = std::make_shared<CheckPointTimeLoop<Scalar>>(0, dt, tEnd);
-    timeLoop->setMaxTimeStepSize(maxDt);
-    problem->setTimeLoop(timeLoop);
-
     // the solution vector
     using SolutionVector = GetPropType<TypeTag, Properties::SolutionVector>;
     SolutionVector x;
@@ -187,7 +212,6 @@ int main(int argc, char** argv) try
     problem->applyInitialSolution(x);
     problem->updateStaticWallProperties();
     problem->updateDynamicWallProperties(x);
-    auto xOld = x;
 
     // the grid variables
     using GridVariables = GetPropType<TypeTag, Properties::GridVariables>;
@@ -198,9 +222,7 @@ int main(int argc, char** argv) try
     using IOFields = GetPropType<TypeTag, Properties::IOFields>;
     StaggeredVtkOutputModule<GridVariables, SolutionVector> vtkWriter(*gridVariables, x, problem->name());
     IOFields::initOutputModule(vtkWriter); // Add model specific output fields
-    vtkWriter.write(0.0);
-
-    auto analyticalSolution = createAnalyticalSolution(timeLoop->time(), *problem);
+    auto analyticalSolution = createAnalyticalSolution(*problem);
     vtkWriter.addField(std::get<0>(analyticalSolution), "pressureExact");
     vtkWriter.addField(std::get<1>(analyticalSolution), "turbulentKineticEnergyExact");
     vtkWriter.addField(std::get<2>(analyticalSolution), "dissipationExact");
@@ -210,7 +232,7 @@ int main(int argc, char** argv) try
 
     // the assembler with time loop for instationary problem
     using Assembler = StaggeredFVAssembler<TypeTag, DiffMethod::numeric>;
-    auto assembler = std::make_shared<Assembler>(problem, gridGeometry, gridVariables, timeLoop, xOld);
+    auto assembler = std::make_shared<Assembler>(problem, gridGeometry, gridVariables);
 
     // the linear solver
     using LinearSolver = Dumux::UMFPackBackend;
@@ -220,63 +242,22 @@ int main(int argc, char** argv) try
     using NewtonSolver = Dumux::NewtonSolver<Assembler, LinearSolver>;
     NewtonSolver nonLinearSolver(assembler, linearSolver);
 
-    // time loop
-    timeLoop->start(); do
-    {
-        // solve the non-linear system with time step control
-        nonLinearSolver.solve(x, *timeLoop);
+    // Solve the system
+    Dune::Timer timer;
+    nonLinearSolver.solve(x);
 
-        // make the new solution the old solution
-        xOld = x;
-        gridVariables->advanceTimeStep();
+    const bool shouldPrintL2Error = getParam<bool>("Problem.PrintL2Error");
+    if (shouldPrintL2Error)
+        printL2Error(problem, x, gridGeometry);
 
-        // update wall properties
-        problem->updateDynamicWallProperties(x);
-        assembler->updateGridVariables(x);
+    // write vtk output
+    vtkWriter.write(1.0);
+    timer.stop();
 
-        if (printL2Error)
-        {
-            using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
-            using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
-            using PrimaryVariables = GetPropType<TypeTag, Properties::PrimaryVariables>;
-
-            using L2Error = NavierStokesTestL2Error<Scalar, ModelTraits, PrimaryVariables>;
-            const auto l2error = L2Error::calculateL2Error(*problem, x);
-            const int numCellCenterDofs = gridGeometry->numCellCenterDofs();
-            const int numFaceDofs = gridGeometry->numFaceDofs();
-            std::cout << std::setprecision(8) << "** L2 error (abs/rel) for "
-                    << std::setw(6) << numCellCenterDofs << " cc dofs and " << numFaceDofs << " face dofs (total: " << numCellCenterDofs + numFaceDofs << "): "
-                    << std::scientific
-                    << "L2(p) = " << l2error.first[Indices::pressureIdx] << " / " << l2error.second[Indices::pressureIdx]
-                    << ", L2(k) = " << l2error.first[Indices::turbulentKineticEnergyIdx] << " / " << l2error.second[Indices::turbulentKineticEnergyIdx]
-                    << ", L2(w) = " << l2error.first[Indices::dissipationIdx] << " / " << l2error.second[Indices::dissipationIdx]
-                    << ", L2(vx) = " << l2error.first[Indices::velocityXIdx] << " / " << l2error.second[Indices::velocityXIdx]
-                    << ", L2(vy) = " << l2error.first[Indices::velocityYIdx] << " / " << l2error.second[Indices::velocityYIdx]
-                    << std::endl;
-        }
-
-        // advance to the time loop to the next step
-        timeLoop->advanceTimeStep();
-        problem->updateTime(timeLoop->time());
-        analyticalSolution = createAnalyticalSolution(timeLoop->time(), *problem);
-
-        // write vtk output
-        vtkWriter.write(timeLoop->time());
-
-        // report statistics of this time step
-        timeLoop->reportTimeStep();
-
-        // set new dt as suggested by newton solver
-        timeLoop->setTimeStepSize(nonLinearSolver.suggestTimeStepSize(timeLoop->timeStepSize()));
-        problem->updateTimeStepSize(timeLoop->timeStepSize());
-
-    } while (!timeLoop->finished());
-
-    timeLoop->finalize(leafGridView.comm());
-
-    ////////////////////////////////////////////////////////////
-    // finalize, print dumux message to say goodbye
-    ////////////////////////////////////////////////////////////
+    const auto& comm = Dune::MPIHelper::getCollectiveCommunication();
+    std::cout << "Simulation took " << timer.elapsed() << " seconds on "
+              << comm.size() << " processes.\n"
+              << "The cumulative CPU time was " << timer.elapsed()*comm.size() << " seconds.\n";
 
     // print dumux end message
     if (mpiHelper.rank() == 0)
