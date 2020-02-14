@@ -1,22 +1,29 @@
 [Grid]
-LowerLeft = 0 0
-UpperRight = 1.0 1.0
-Cells = 40 40
+UpperRight = 1 1
+Cells = 4 4
 
 [Problem]
 Name = test_ff_analytic_rans
-EnableGravity = true
+EnableGravity = false
 PrintL2Error = true
 EnableInertiaTerms = true
 
 [Component]
-LiquidDensity  = 1.0e0 # kg/m^3
-LiquidKinematicViscosity = 1.0e-0 # m^2/s
+LiquidDensity  = 1.0 # kg/m^3
+LiquidKinematicViscosity = 1.0 # m^2/s
+Temperature = 283.15 # [K]
 
-[ Newton ]
+[Newton]
 MaxSteps = 100
-MaxRelativeShift = 1e-5
+MaxRelativeShift = 1e-6
+
+[KOmega]
+EnableProductionLimiter = true
+EnableDissipationLimiter = true
 
 [Vtk]
 WriteFaceData = false
+AddProcessRank = false
 
+[Flux]
+UpwindWeight = 1

@@ -19,10 +19,8 @@
 /*!
  * \file
  * \ingroup RANSTests
- * \brief Pipe flow test for the staggered grid RANS model
- *
- * This test simulates pipe flow experiments performed by John Laufer in 1954
- * \cite Laufer1954a.
+ * \brief Test for the Reynolds Averaged Navier-Stokes model with the Komega turbulence model as closure.
+ *        Comparison to an analytical solution.
  */
 #ifndef DUMUX_PIPE_LAUFER_PROBLEM_HH
 #define DUMUX_PIPE_LAUFER_PROBLEM_HH
@@ -88,11 +86,10 @@ struct EnableGridVolumeVariablesCache<TypeTag, TTag::RANSModel> { static constex
 } // end namespace Properties
 
 /*!
- * \ingroup NavierStokesTests
- * \brief  Test problem for the one-phase (Navier-) Stokes problem in a channel.
- *
- * This test simulates is based on pipe flow experiments by
- * John Laufers experiments in 1954 \cite Laufer1954a.
+ * \file
+ * \ingroup RANSTests
+ * \brief Test for the Reynolds Averaged Navier-Stokes model with the Komega turbulence model as closure.
+ *        Comparison to an analytical solution.
  */
 template <class TypeTag>
 class AnalyticalRANSProblem : public RANSProblem<TypeTag>
@@ -103,9 +100,11 @@ class AnalyticalRANSProblem : public RANSProblem<TypeTag>
     using FluidSystem = GetPropType<TypeTag, Properties::FluidSystem>;
     using FluidState = GetPropType<TypeTag, Properties::FluidState>;
     using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+    static constexpr auto dimWorld = GridGeometry::GridView::dimensionworld;
 
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
     using Element = typename GridGeometry::GridView::template Codim<0>::Entity;
+    using NumEqVector = GetPropType<TypeTag, Properties::NumEqVector>;
     using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
     using FVElementGeometry = typename GetPropType<TypeTag, Properties::GridGeometry>::LocalView;
     using SubControlVolume = typename FVElementGeometry::SubControlVolume;
@@ -113,77 +112,55 @@ class AnalyticalRANSProblem : public RANSProblem<TypeTag>
 
     using ModelTraits = GetPropType<TypeTag, Properties::ModelTraits>;
     using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
-    using NumEqVector = GetPropType<TypeTag, Properties::NumEqVector>;
     using PrimaryVariables = GetPropType<TypeTag, Properties::PrimaryVariables>;
+    using VelocityVector = Dune::FieldVector<Scalar, dimWorld>;
 
     struct TurbulentConstants
-    {
-        Scalar alpha_, betaK_, sigmaK_, betaOmega_, sigmaOmega_;
-        TurbulentConstants(const Scalar alpha = 0.0, const Scalar betaK = 0.0, const Scalar sigmaK = 0.0, const Scalar betaOmega = 0.0, const Scalar sigmaOmega = 0.0)
-        : alpha_(alpha)
-        , betaK_(betaK)
-        , sigmaK_(sigmaK)
-        , betaOmega_(betaOmega)
-        , sigmaOmega_(sigmaOmega)
-        {}
-    };
+    { Scalar alpha, betaK, sigmaK, betaOmega, sigmaOmega; };
 
-    static constexpr auto dimWorld = GridGeometry::GridView::dimensionworld;
     using AnalyticalModel = typename Dumux::KOmegaAnalytical<Scalar, GlobalPosition, PrimaryVariables, ModelTraits, TurbulentConstants, dimWorld>;
 
 public:
     AnalyticalRANSProblem(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry), eps_(1e-6)
     {
-        TurbulentConstants turbulentConstants_(ParentType::alpha(), ParentType::betaK(), ParentType::sigmaK(), ParentType::betaOmega(), ParentType::sigmaOmega());
+        createAnalyticalSolution_();
 
         turbulenceModelName_ = turbulenceModelToString(ModelTraits::turbulenceModel());
         std::cout << "Using the "<< turbulenceModelName_ << " Turbulence Model. \n";
         std::cout << std::endl;
     }
 
-   /*!
+    /*!
      * \name Problem parameters
      */
     // \{
-
-    NumEqVector analyticalSolutionAtPos(const GlobalPosition globalPos) const
-    {
-        const AnalyticalModel analyticalModel_(density_, constantKinematicViscosity_, turbulentConstants_, this->gravity());
-        return analyticalModel_.solution(globalPos);
-    }
-
     bool isOnWallAtPos(const GlobalPosition &globalPos) const
     {
-        return globalPos[0] < this->gridGeometry().bBoxMin()[0] + eps_
-               || globalPos[0] > this->gridGeometry().bBoxMax()[0] + eps_
-               || globalPos[1] < this->gridGeometry().bBoxMin()[1] + eps_
-               || globalPos[1] > this->gridGeometry().bBoxMax()[1] - eps_;
+        bool isOnWallAtPos(0);
+        isOnWallAtPos = globalPos[0] < this->gridGeometry().bBoxMin()[0] + eps_
+                         || globalPos[0] > this->gridGeometry().bBoxMax()[0] - eps_;
+        if (dimWorld > 1)
+            isOnWallAtPos = globalPos[0] < this->gridGeometry().bBoxMin()[0] + eps_
+                         || globalPos[0] > this->gridGeometry().bBoxMax()[0] - eps_
+                         || globalPos[1] < this->gridGeometry().bBoxMin()[1] + eps_
+                         || globalPos[1] > this->gridGeometry().bBoxMax()[1] - eps_;
+        return isOnWallAtPos;
     }
 
-   /*!
+    /*!
      * \brief Returns the temperature [K] within the domain for the isothermal model.
      */
     Scalar temperature() const
     { return temperature_; }
-
-   /*!
-     * \brief Returns the sources within the domain.
-     *
-     * \param globalPos The global position
-     */
-    NumEqVector sourceAtPos(const GlobalPosition &globalPos) const
-    {
-        return NumEqVector(analyticalSolutionAtPos(globalPos));
-    }
     // \}
 
    /*!
-     * \name Boundary conditions
+     * \name Boundary and Initial Conditions
      */
     // \{
 
-   /*!
+    /*!
      * \brief Specifies which kind of boundary condition should be
      *        used for which equation on a given boundary control volume.
      *
@@ -192,63 +169,175 @@ public:
     BoundaryTypes boundaryTypesAtPos(const GlobalPosition &globalPos) const
     {
         BoundaryTypes values;
-        values.setDirichlet(Indices::pressureIdx);
-        values.setNeumann(Indices::velocityXIdx);
-        values.setNeumann(Indices::velocityYIdx);
+        values.setDirichlet(Indices::velocityXIdx);
+        if (dimWorld > 1)
+            values.setDirichlet(Indices::velocityYIdx);
         values.setDirichlet(Indices::turbulentKineticEnergyIdx);
         values.setDirichlet(Indices::dissipationIdx);
 
         return values;
     }
 
-     /*!
-      * \brief Evaluate the boundary conditions for a dirichlet values at the boundary.
-      *
-      * \param element The finite element
-      * \param scvf the sub control volume face
-      * \note used for cell-centered discretization schemes
-      */
-    NumEqVector dirichlet(const Element& element, const SubControlVolumeFace& scvf) const
+    /*!
+     * \brief Returns the sources within the domain.
+     *
+     * \param globalPos The global position
+     */
+    PrimaryVariables sourceAtPos(const GlobalPosition &globalPos) const
     {
-        const auto globalPos = scvf.ipGlobal();
-        NumEqVector values(initialAtPos(globalPos));
-
+        PrimaryVariables values(analyticalSolutionAtPos_(globalPos));
         return values;
     }
 
     /*!
-     * \brief Evaluate the boundary conditions for fixed values at cell centers
+     * \brief Returns whether a fixed Dirichlet value shall be used at a given cell.
      *
      * \param element The finite element
-     * \param scv the sub control volume
-     * \note used for cell-centered discretization schemes
+     * \param fvGeometry The finite-volume geometry
+     * \param scv The sub control volume
+     * \param pvIdx The primary variable index in the solution vector
      */
-    NumEqVector dirichlet(const Element& element, const SubControlVolume& scv) const
+    bool isDirichletCell(const Element& element,
+                         const typename GridGeometry::LocalView& fvGeometry,
+                         const typename GridGeometry::SubControlVolume& scv,
+                         int pvIdx) const
     {
-        const auto globalPos = scv.center();
-        NumEqVector values(initialAtPos(globalPos));
-        return values;
+        bool onBoundary = false;
+        for (const auto& scvf : scvfs(fvGeometry))
+            onBoundary = std::max(onBoundary, scvf.boundary());
+        return onBoundary;
     }
 
-   /*!
+    /*!
+     * \brief Return dirichlet boundary values at a given position
+     *
+     * \param globalPos The global position
+     */
+    PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
+    {
+        // use the values of the analytical solution from the initial condition
+        return initialAtPos(globalPos);
+    }
+
+    /*!
      * \brief Evaluate the initial value for a control volume.
      *
      * \param globalPos The global position
      */
-    NumEqVector initialAtPos(const GlobalPosition& globalPos) const
+    PrimaryVariables initialAtPos(const GlobalPosition& globalPos) const
     {
-        NumEqVector values(analyticalSolutionAtPos(globalPos));
+        // use the values of the analytical solution
+        PrimaryVariables values(analyticalSolutionAtPos_(globalPos));
         return values;
     }
 
     // \}
 
+    /*!
+     * \name Convenience Functions
+     */
+    // \{
+
+    /*!
+     * \brief Returns the analytical solution for the Pressure
+     */
+    auto& getAnalyticalPressureSolution() const
+    { return analyticalPressure_; }
+
+    /*!
+     * \brief Returns the analytical solution for the Turbulent Kinetic Energy
+     */
+    auto& getAnalyticalTurbulentKineticEnergySolution() const
+    { return analyticalTurbulentKineticEnergy_; }
+
+    /*!
+     * \brief Returns the analytical solution for the Dissipation
+     */
+    auto& getAnalyticalDissipationSolution() const
+    { return analyticalDissipiation_; }
+
+    /*!
+     * \brief Returns the analytical solution for the Velocity at the cell center
+     */
+    auto& getAnalyticalVelocitySolution() const
+    { return analyticalVelocity_; }
+
+    /*!
+     * \brief Returns the analytical solution for the Velocity at the faces
+     */
+    auto& getAnalyticalVelocitySolutionOnFace() const
+    { return analyticalVelocityOnFace_; }
+
+    // \}
+
 private:
+
+    NumEqVector analyticalSolutionAtPos_(const GlobalPosition globalPos) const
+    {
+        const AnalyticalModel analyticalModel_(density_, constantKinematicViscosity_, turbulentConstants_);
+        return analyticalModel_.solution(globalPos);
+    }
+
+    void createAnalyticalSolution_()
+    {
+        turbulentConstants_.alpha = ParentType::alpha();
+        turbulentConstants_.betaK = ParentType::betaK();
+        turbulentConstants_.sigmaK = ParentType::sigmaK();
+        turbulentConstants_.betaOmega = ParentType::betaOmega();
+        turbulentConstants_.sigmaOmega = ParentType::sigmaOmega();
+
+        analyticalPressure_.resize(this->gridGeometry().numCellCenterDofs());
+        analyticalTurbulentKineticEnergy_.resize(this->gridGeometry().numCellCenterDofs());
+        analyticalDissipiation_.resize(this->gridGeometry().numCellCenterDofs());
+        analyticalVelocity_.resize(this->gridGeometry().numCellCenterDofs());
+        analyticalVelocityOnFace_.resize(this->gridGeometry().numFaceDofs());
+
+        for (const auto& element : elements(this->gridGeometry().gridView()))
+        {
+            auto fvGeometry = localView(this->gridGeometry());
+            fvGeometry.bindElement(element);
+            for (auto&& scv : scvs(fvGeometry))
+            {
+                auto ccDofIdx = scv.dofIndex();
+                auto ccDofPosition = scv.dofPosition();
+                auto analyticalSolutionAtCc = analyticalSolutionAtPos_(ccDofPosition);
+
+                // Pressure at the CC
+                analyticalPressure_[ccDofIdx] = analyticalSolutionAtCc[Indices::pressureIdx];
+
+                // Turbulence Variables at the CC
+                analyticalPressure_[ccDofIdx] = analyticalSolutionAtCc[Indices::turbulentKineticEnergyIdx];
+                analyticalPressure_[ccDofIdx] = analyticalSolutionAtCc[Indices::dissipationIdx];
+
+                // velocities at the cell center
+                for(int dirIdx = 0; dirIdx < ModelTraits::dim(); ++dirIdx)
+                    analyticalVelocity_[ccDofIdx][dirIdx] = analyticalSolutionAtCc[Indices::velocity(dirIdx)];
+
+                // Velocities on the faces
+                for (auto&& scvf : scvfs(fvGeometry))
+                {
+                    const auto faceDofIdx = scvf.dofIndex();
+                    const auto faceDofPosition = scvf.center();
+                    const auto dirIdx = scvf.directionIndex();
+                    const auto analyticalSolutionAtFace = analyticalSolutionAtPos_(faceDofPosition);
+                    analyticalVelocityOnFace_[faceDofIdx][dirIdx] = analyticalSolutionAtFace[Indices::velocity(dirIdx)];
+                }
+            }
+        }
+    }
+
     Scalar eps_;
-    Scalar density_ = getParam<Scalar>("Problem.Density", 1.0);
-    Scalar constantKinematicViscosity_ = getParam<Scalar>("Problem.KinematicViscosity", 1.0);
-    Scalar temperature_ = getParam<Scalar>("Problem.Temperature", 283.15);
+    Scalar density_ = getParam<Scalar>("Component.LiquidDensity");
+    Scalar constantKinematicViscosity_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
+    Scalar temperature_ = getParam<Scalar>("Component.Temperature");
     TurbulentConstants turbulentConstants_;
+
+    std::vector<Scalar> analyticalPressure_;
+    std::vector<Scalar> analyticalTurbulentKineticEnergy_;
+    std::vector<Scalar> analyticalDissipiation_;
+    std::vector<VelocityVector> analyticalVelocity_;
+    std::vector<VelocityVector> analyticalVelocityOnFace_;
+
     std::string turbulenceModelName_;
 };
 } // end namespace Dumux

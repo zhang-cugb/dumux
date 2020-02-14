@@ -70,71 +70,6 @@ void usage(const char *progName, const std::string &errorMsg)
                   << "\n";
     }
 }
-/*!
-* \brief Creates analytical solution.
-* Returns a tuple of the analytical solution for the pressure, the velocity and the velocity at the faces
-* \param time the time at which to evaluate the analytical solution
-* \param problem the problem for which to evaluate the analytical solution
-*/
-template<class Problem>
-auto createAnalyticalSolution(const Problem& problem)
-{
-    using namespace Dumux;
-    using TypeTag = Properties::TTag::TYPETAG;
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    using Indices = typename GetPropType<TypeTag, Properties::ModelTraits>::Indices;
-
-    const auto& gridGeometry = problem.gridGeometry();
-    using GridView = typename std::decay_t<decltype(gridGeometry)>::GridView;
-
-    static constexpr auto dim = GridView::dimension;
-    static constexpr auto dimWorld = GridView::dimensionworld;
-
-    using VelocityVector = Dune::FieldVector<Scalar, dimWorld>;
-
-    std::vector<Scalar> analyticalPressure;
-    std::vector<Scalar> analyticalTurbulentKineticEnergy;
-    std::vector<Scalar> analyticalDissipation;
-    std::vector<VelocityVector> analyticalVelocity;
-    std::vector<VelocityVector> analyticalVelocityOnFace;
-
-    analyticalPressure.resize(gridGeometry.numCellCenterDofs());
-    analyticalTurbulentKineticEnergy.resize(gridGeometry.numCellCenterDofs());
-    analyticalDissipation.resize(gridGeometry.numCellCenterDofs());
-    analyticalVelocity.resize(gridGeometry.numCellCenterDofs());
-    analyticalVelocityOnFace.resize(gridGeometry.numFaceDofs());
-
-    for (const auto& element : elements(gridGeometry.gridView()))
-    {
-        auto fvGeometry = localView(gridGeometry);
-        fvGeometry.bindElement(element);
-        for (auto&& scv : scvs(fvGeometry))
-        {
-            auto ccDofIdx = scv.dofIndex();
-            auto ccDofPosition = scv.dofPosition();
-            auto analyticalSolutionAtCc = problem.analyticalSolutionAtPos(ccDofPosition);
-
-            // velocities on faces
-            for (auto&& scvf : scvfs(fvGeometry))
-            {
-                const auto faceDofIdx = scvf.dofIndex();
-                const auto faceDofPosition = scvf.center();
-                const auto dirIdx = scvf.directionIndex();
-                const auto analyticalSolutionAtFace = problem.analyticalSolutionAtPos(faceDofPosition);
-                analyticalVelocityOnFace[faceDofIdx][dirIdx] = analyticalSolutionAtFace[Indices::velocity(dirIdx)];
-            }
-
-            analyticalPressure[ccDofIdx] = analyticalSolutionAtCc[Indices::pressureIdx];
-            analyticalTurbulentKineticEnergy[ccDofIdx] = analyticalSolutionAtCc[Indices::turbulentKineticEnergyIdx];
-            analyticalDissipation[ccDofIdx] = analyticalSolutionAtCc[Indices::dissipationIdx];
-
-            for(int dirIdx = 0; dirIdx < dim; ++dirIdx)
-                analyticalVelocity[ccDofIdx][dirIdx] = analyticalSolutionAtCc[Indices::velocity(dirIdx)];
-        }
-    }
-
-    return std::make_tuple(analyticalPressure, analyticalTurbulentKineticEnergy, analyticalDissipation, analyticalVelocity, analyticalVelocityOnFace);
-}
 
 template<class Problem, class SolutionVector, class GridGeometry>
 void printL2Error(const Problem& problem, const SolutionVector& x, const GridGeometry& gridGeometry)
@@ -148,17 +83,17 @@ void printL2Error(const Problem& problem, const SolutionVector& x, const GridGeo
 
     using L2Error = NavierStokesTestL2Error<Scalar, ModelTraits, PrimaryVariables>;
     const auto l2error = L2Error::calculateL2Error(*problem, x);
-    const int numCellCenterDofs = gridGeometry->numCellCenterDofs();
-    const int numFaceDofs = gridGeometry->numFaceDofs();
-    std::cout << std::setprecision(8) << "** L2 error (abs/rel) for "
-            << std::setw(6) << numCellCenterDofs << " cc dofs and " << numFaceDofs << " face dofs (total: " << numCellCenterDofs + numFaceDofs << "): "
-            << std::scientific
-            << "L2(p) = " << l2error.first[Indices::pressureIdx] << " / " << l2error.second[Indices::pressureIdx]
-            << ", L2(vx) = " << l2error.first[Indices::velocityXIdx] << " / " << l2error.second[Indices::velocityXIdx]
-            << ", L2(vy) = " << l2error.first[Indices::velocityYIdx] << " / " << l2error.second[Indices::velocityYIdx]
-            << ", L2(k) = " << l2error.first[Indices::turbulentKineticEnergyIdx] << " / " << l2error.second[Indices::turbulentKineticEnergyIdx]
-            << ", L2(w) = " << l2error.first[Indices::dissipationIdx] << " / " << l2error.second[Indices::dissipationIdx]
-            << std::endl;
+//     const int numCellCenterDofs = gridGeometry->numCellCenterDofs();
+//     const int numFaceDofs = gridGeometry->numFaceDofs();
+//     std::cout << std::setprecision(8) << "** L2 error (abs/rel) for "
+//             << std::setw(6) << numCellCenterDofs << " cc dofs and " << numFaceDofs << " face dofs (total: " << numCellCenterDofs + numFaceDofs << "): "
+//             << std::scientific
+//             << "L2(p) = " << l2error.first[Indices::pressureIdx] << " / " << l2error.second[Indices::pressureIdx]
+//             << ", L2(vx) = " << l2error.first[Indices::velocityXIdx] << " / " << l2error.second[Indices::velocityXIdx]
+//             << ", L2(vy) = " << l2error.first[Indices::velocityYIdx] << " / " << l2error.second[Indices::velocityYIdx]
+//             << ", L2(k) = " << l2error.first[Indices::turbulentKineticEnergyIdx] << " / " << l2error.second[Indices::turbulentKineticEnergyIdx]
+//             << ", L2(w) = " << l2error.first[Indices::dissipationIdx] << " / " << l2error.second[Indices::dissipationIdx]
+//             << std::endl;
 
     // write the norm into a log file
     std::ofstream logFile;
@@ -169,6 +104,17 @@ void printL2Error(const Problem& problem, const SolutionVector& x, const GridGeo
             << " L2(vy) = " << l2error.first[Indices::velocityYIdx]
             << std::endl;
     logFile.close();
+}
+
+template<class Problem>
+auto collectAnalyticalSolution(const Problem& problem)
+{
+    auto analyticalPressure = problem.getAnalyticalPressureSolution();
+    auto analyticalTurbulentKineticEnergy = problem.getAnalyticalTurbulentKineticEnergySolution();
+    auto analyticalDissipation = problem.getAnalyticalDissipationSolution();
+    auto analyticalVelocity = problem.getAnalyticalVelocitySolution();
+    auto analyticalVelocityOnFace = problem.getAnalyticalVelocitySolutionOnFace();
+    return std::make_tuple(analyticalPressure, analyticalTurbulentKineticEnergy, analyticalDissipation, analyticalVelocity, analyticalVelocityOnFace);
 }
 
 int main(int argc, char** argv) try
@@ -222,7 +168,7 @@ int main(int argc, char** argv) try
     using IOFields = GetPropType<TypeTag, Properties::IOFields>;
     StaggeredVtkOutputModule<GridVariables, SolutionVector> vtkWriter(*gridVariables, x, problem->name());
     IOFields::initOutputModule(vtkWriter); // Add model specific output fields
-    auto analyticalSolution = createAnalyticalSolution(*problem);
+    auto analyticalSolution = collectAnalyticalSolution(*problem);
     vtkWriter.addField(std::get<0>(analyticalSolution), "pressureExact");
     vtkWriter.addField(std::get<1>(analyticalSolution), "turbulentKineticEnergyExact");
     vtkWriter.addField(std::get<2>(analyticalSolution), "dissipationExact");

@@ -70,8 +70,8 @@ public:
             {
                 // treat cell-center dofs
                 const auto dofIdxCellCenter = scv.dofIndex();
-                const auto& posCellCenter = scv.dofPosition();
-                const auto analyticalSolutionCellCenter = problem.analyticalSolutionAtPos(posCellCenter)[Indices::pressureIdx];
+//                 const auto& posCellCenter = scv.dofPosition();
+                const auto analyticalSolutionCellCenter = problem.getAnalyticalPressureSolution()[dofIdxCellCenter];
                 const auto numericalSolutionCellCenter = curSol[GridGeometry::cellCenterIdx()][dofIdxCellCenter][Indices::pressureIdx - ModelTraits::dim()];
                 sumError[Indices::pressureIdx] += squaredDiff_(analyticalSolutionCellCenter, numericalSolutionCellCenter) * scv.volume();
                 sumReference[Indices::pressureIdx] += analyticalSolutionCellCenter * analyticalSolutionCellCenter * scv.volume();
@@ -82,7 +82,7 @@ public:
                 {
                     const int dofIdxFace = scvf.dofIndex();
                     const int dirIdx = scvf.directionIndex();
-                    const auto analyticalSolutionFace = problem.analyticalSolutionAtPos(scvf.center())[Indices::velocity(dirIdx)];
+                    const auto analyticalSolutionFace = problem.getAnalyticalVelocitySolutionOnFace()[dofIdxFace][dirIdx];
                     const auto numericalSolutionFace = curSol[GridGeometry::faceIdx()][dofIdxFace][0];
                     directionIndex[dofIdxFace] = dirIdx;
                     errorVelocity[dofIdxFace] = squaredDiff_(analyticalSolutionFace, numericalSolutionFace);

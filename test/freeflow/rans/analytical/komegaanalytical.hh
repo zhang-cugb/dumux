@@ -55,15 +55,12 @@ public:
     using Indices = typename ModelTraits::Indices;
     using GravityVector = Dune::FieldVector<Scalar, dim>;
 
-    KOmegaAnalytical(const Scalar density, const Scalar kinematicViscosity, const TurbulentConstants turbConstants, const GravityVector gravity)
+    KOmegaAnalytical(const Scalar density, const Scalar kinematicViscosity, const TurbulentConstants turbConstants)
     : density_(density)
     , kinematicViscosity_(kinematicViscosity)
     , turbConstants_(turbConstants)
-    , gravity_(gravity)
     {}
 
-    std::string word() const
-    { return "works"; }
     /*!
     * \brief Returns the analytical solution of the problem at a given time and position.
     *
@@ -75,9 +72,12 @@ public:
         PrimaryVariables values;
 
         values[Indices::pressureIdx] = sourceMassBalanceAtPos(globalPos);
-        values[Indices::velocityXIdx] = sourceMomentumBalanceAtPos(globalPos)[0];
+
+        const VelocityVector momentumSolution = sourceMomentumBalanceAtPos(globalPos);
+        values[Indices::momentumXBalanceIdx] = momentumSolution[0];
         if (dim > 1)
-            values[Indices::velocityYIdx] = sourceMomentumBalanceAtPos(globalPos)[1];
+            values[Indices::momentumYBalanceIdx] = momentumSolution[1];
+
         values[Indices::turbulentKineticEnergyIdx] = sourceTurbulentKineticEnergyBalanceAtPos(globalPos);
         values[Indices::dissipationIdx] = sourceDissipationBalanceAtPos(globalPos);
 
@@ -85,33 +85,40 @@ public:
     }
 
 private:
-    VelocityVector velocity(const GlobalPosition& globalPos) const
-    {
-        VelocityVector v(0.0);
-        const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
-        v[0] = 2.0 * x * x * x;
-        if (dim > 1)
-            v[1] = 2.0 - 2.0 * y * y * y;
-        return v;
-    }
 
     Scalar pressure(const GlobalPosition& globalPos) const
     {
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         if (dim > 1)
+        {
+            const Scalar y = globalPos[1];
             return 2.0 - 2.0 * x * y;
+        }
         else
             return 2.0 - 2.0 * x;
+    }
+
+    VelocityVector velocity(const GlobalPosition& globalPos) const
+    {
+        VelocityVector v(0.0);
+        const Scalar x = globalPos[0];
+        v[0] = 2.0 * x * x * x;
+        if (dim > 1)
+        {
+            const Scalar y = globalPos[1];
+            v[1] = 2.0 - 2.0 * y * y * y;
+        }
+        return v;
     }
 
     Scalar turbulentKineticEnergy(const GlobalPosition& globalPos) const
     {
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         if (dim > 1)
+        {
+            const Scalar y = globalPos[1];
             return 1.0 + x * x * y * y;
+        }
         else
             return 1.0 + x * x;
     }
@@ -119,11 +126,21 @@ private:
     Scalar dissipation(const GlobalPosition& globalPos) const
     {
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         if (dim > 1)
+        {
+            const Scalar y = globalPos[1];
             return 2.0 - x * x * y * y;
+        }
         else
             return 2.0 - x * x;
+    }
+
+    Scalar limitedDissipation(const GlobalPosition& globalPos) const
+    {
+        // use the Dissipation limiter proposed in wilcox2008
+        using std::sqrt;
+        using std::max;
+        return (7.0 / 8.0) * sqrt(2.0 * shearStressTensorProduct(globalPos) / turbConstants_.betaK);
     }
 
     //! \brief The gradients
@@ -131,12 +148,14 @@ private:
     {
         VelocityGradientMatrix dvdx;
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dvdx[0][0] = 6.0 * x * x;
-        dvdx[0][1] = 0.0;
-        dvdx[1][0] = 0.0;
-        dvdx[1][1] = -6.0 * y * y;
-
+        if (dim > 1)
+        {
+            const Scalar y = globalPos[1];
+            dvdx[0][1] = 0.0;
+            dvdx[1][0] = 0.0;
+            dvdx[1][1] = -6.0 * y * y;
+        }
         return dvdx;
     }
 
@@ -144,9 +163,14 @@ private:
     {
         VelocityGradientMatrix dv2dx;
         for (unsigned int velIdx = 0; velIdx < dim; ++velIdx)
+        {
             for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
+            {
                 dv2dx[velIdx][dimIdx] = dvdx(globalPos)[velIdx][dimIdx] * velocity(globalPos)[dimIdx]
-                                    + dvdx(globalPos)[dimIdx][dimIdx] * velocity(globalPos)[velIdx];
+                                      + dvdx(globalPos)[dimIdx][dimIdx] * velocity(globalPos)[velIdx];
+            }
+        }
+
         return dv2dx;
     }
 
@@ -154,10 +178,10 @@ private:
     {
         VelocityGradientMatrix dvdx2;
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dvdx2[0][0] = 12.0 * x;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dvdx2[0][1] = 0.0;
             dvdx2[1][0] = 0.0;
             dvdx2[1][1] = -12.0 * y;
@@ -169,10 +193,10 @@ private:
     {
         ScalarGradientVector dpdx(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dpdx[0] = -2.0;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dpdx[0] = -2.0 * y;
             dpdx[1] = -2.0 * x;
         }
@@ -183,10 +207,10 @@ private:
     {
         ScalarGradientVector dkdx(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dkdx[0] = 2.0 * x;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dkdx[0] = 2.0 * x * y * y;
             dkdx[1] = 2.0 * y * x * x;
         }
@@ -197,10 +221,10 @@ private:
     {
         ScalarGradientVector dkdx2(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dkdx2[0] = 2.0;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dkdx2[0] = 2.0 * y * y;
             dkdx2[1] = 2.0 * x * x;
         }
@@ -211,10 +235,10 @@ private:
     {
         ScalarGradientVector dwdx(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dwdx[0] = -2.0 * x;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dwdx[0] = -2.0 * x * y * y;
             dwdx[1] = -2.0 * x * x * y;
         }
@@ -225,10 +249,10 @@ private:
     {
         ScalarGradientVector dwdx2(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
         dwdx2[0] = -2.0;
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dwdx2[0] = -2.0 * y * y;
             dwdx2[1] = -2.0 * x * x;
         }
@@ -237,24 +261,51 @@ private:
 
     // eddy viscosity and its gradient
     Scalar nut(const GlobalPosition& globalPos) const
-    { return turbulentKineticEnergy(globalPos) / dissipation(globalPos); }
+    {
+        using std::max;
+        // use the Dissipation limiter proposed in wilcox2008
+        static const auto enableKOmegaDissipationLimiter
+            = getParam<bool>("KOmega.EnableDissipationLimiter", true);
+        if (enableKOmegaDissipationLimiter)
+            return turbulentKineticEnergy(globalPos) / max(dissipation(globalPos), limitedDissipation(globalPos));
+
+        return turbulentKineticEnergy(globalPos) / dissipation(globalPos);
+    }
 
     ScalarGradientVector dnutdx(const GlobalPosition& globalPos) const
     {
+        using std::sqrt;
+        using std::pow;
         ScalarGradientVector dnutdx(0.0);
         const Scalar x = globalPos[0];
-        const Scalar y = globalPos[1];
-        dnutdx[0] = 6*x
-                / ((2-(x*x))
-                * (2-(x*x)));
+
+        static const auto enableKOmegaDissipationLimiter
+            = getParam<bool>("KOmega.EnableDissipationLimiter", true);
+        if (enableKOmegaDissipationLimiter)
+        {    const bool inLimiterSpace = limitedDissipation(globalPos) > dissipation(globalPos);
+            if (inLimiterSpace)
+            {
+                dnutdx[0] = (4. * sqrt(2.)) / ( 21. * x * sqrt(x*x*x*x / turbConstants_.betaK));
+                if (dim > 1)
+                {
+                    const Scalar y = globalPos[1];
+                    dnutdx[0] = (4. * sqrt(2.) * (x*x*x - x*y*y*y*y*y*y))
+                              / ( 21. * turbConstants_.betaK * pow((x*x*x*x + y*y*y*y) / turbConstants_.betaK, (3./2.)));
+
+                    dnutdx[1] = (4. * sqrt(2.) * y* (x*x*x*x*x*x - y*y))
+                              / ( 21. * turbConstants_.betaK * pow((x*x*x*x + y*y*y*y) / turbConstants_.betaK, (3./2.)));
+                }
+            }
+        }
+
+        dnutdx[0] = (6*x) / ((2-(x*x)) * (2-(x*x)));
         if (dim > 1)
         {
+            const Scalar y = globalPos[1];
             dnutdx[0] = 6*x*y*y
-                    / ((2-(x*x*y*y))
-                    * (2-(x*x*y*y)));
+                    / ((2-(x*x*y*y)) * (2-(x*x*y*y)));
             dnutdx[1] = 6*x*x*y
-                    / ((2-(x*x*y*y))
-                    * (2-(x*x*y*y)));
+                    / ((2-(x*x*y*y)) * (2-(x*x*y*y)));
         }
         return dnutdx;
     }
@@ -264,9 +315,14 @@ private:
     {
         Scalar shearStressTensorProduct = 0.0;
         for (unsigned int velIdx = 0; velIdx < dim; ++velIdx)
+        {
             for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
+            {
                 shearStressTensorProduct += 0.5 * (dvdx(globalPos)[velIdx][dimIdx] + dvdx(globalPos)[dimIdx][velIdx])
-                                        * 0.5 * (dvdx(globalPos)[velIdx][dimIdx] + dvdx(globalPos)[dimIdx][velIdx]);
+                                          * 0.5 * (dvdx(globalPos)[velIdx][dimIdx] + dvdx(globalPos)[dimIdx][velIdx]);
+            }
+        }
+        // Should be 36x^4 +36y^4 (1D: 36x^4)
         return shearStressTensorProduct;
     }
 
@@ -276,14 +332,19 @@ private:
         // term div(rho*v)
         Scalar divV(0.0);
         for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
+        {
             divV += dvdx(globalPos)[dimIdx][dimIdx];
-
+        }
         return density_ * divV;
     }
 
     VelocityVector sourceMomentumBalanceAtPos(const GlobalPosition& globalPos) const
     {
         VelocityVector momentum(0.0);
+        GravityVector gravity(0.0);
+        const bool enableGravity = getParam<bool>("Problem.EnableGravity");
+        if (enableGravity)
+            gravity[dim-1] = -9.81;
 
         for (unsigned int velIdx = 0; velIdx < dim; ++velIdx)
         {
@@ -293,25 +354,25 @@ private:
                 momentum[velIdx] += density_ * dv2dx(globalPos)[velIdx][dimIdx];
 
                 // viscous term (molecular)
-                momentum[velIdx] -= density_ * kinematicViscosity_* dvdx2(globalPos)[velIdx][dimIdx];
-                momentum[velIdx] -= density_ * kinematicViscosity_* dvdx2(globalPos)[dimIdx][velIdx];
+                momentum[velIdx] -= density_ * kinematicViscosity_ * dvdx2(globalPos)[velIdx][dimIdx];
+                momentum[velIdx] -= density_ * kinematicViscosity_ * dvdx2(globalPos)[dimIdx][velIdx];
 
                 // viscous term (turbulent) (using product rule)
                 momentum[velIdx] -= density_ * ((dnutdx(globalPos)[velIdx] * dvdx(globalPos)[velIdx][dimIdx])
-                                            + (nut(globalPos) * dvdx2(globalPos)[velIdx][dimIdx]));
+                                              + (nut(globalPos) * dvdx2(globalPos)[velIdx][dimIdx]));
                 momentum[velIdx] -= density_ * ((dnutdx(globalPos)[dimIdx] * dvdx(globalPos)[velIdx][dimIdx])
-                                            + (nut(globalPos) * dvdx2(globalPos)[dimIdx][velIdx]));
+                                              + (nut(globalPos) * dvdx2(globalPos)[dimIdx][velIdx]));
             }
 
             // pressure term
             momentum[velIdx] += dpdx(globalPos)[velIdx];
 
             // gravity term
-            momentum[velIdx] -= density_ * gravity_[velIdx];
+            if (enableGravity)
+                momentum[velIdx] += density_ * gravity[velIdx];
         }
         return momentum;
     }
-
 
     Scalar sourceTurbulentKineticEnergyBalanceAtPos(const GlobalPosition& globalPos) const
     {
@@ -326,17 +387,17 @@ private:
             turbulentKineticEnergySol -= kinematicViscosity_ * dkdx2(globalPos)[dimIdx];
 
             // Turbulent diffusion term (using product rule)
-            turbulentKineticEnergySol -= turbConstants_.sigmaK_ * ( (dnutdx(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx])
+            turbulentKineticEnergySol -= turbConstants_.sigmaK * ( (dnutdx(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx])
                                                                  + (nut(globalPos) * dkdx2(globalPos)[dimIdx]));
         }
         // Production term (plus 2006 K-limiter via P term)
         Scalar kProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
-        Scalar kProductionAlternative= 20.0 * turbConstants_.betaK_ * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        Scalar kProductionAlternative= 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
         Scalar kProductionMin= std::min(kProductionOriginal, kProductionAlternative);
         turbulentKineticEnergySol -= kProductionMin;
 
         // Destruction term
-        turbulentKineticEnergySol += turbConstants_.betaK_ * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        turbulentKineticEnergySol += turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
 
         return turbulentKineticEnergySol;
     }
@@ -344,27 +405,29 @@ private:
     Scalar sourceDissipationBalanceAtPos(const GlobalPosition& globalPos) const
     {
         Scalar dissipationSol = 0.0;
-        // Advection & Diffusion
+        // Advection & Diffusion (using product rule)
         for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
         {
-            // Advection term (using product rule)
-            dissipationSol += dvdx(globalPos)[dimIdx][dimIdx] * dissipation(globalPos) + velocity(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx];
             // Molecular diffusion term
             dissipationSol -= kinematicViscosity_ * dwdx2(globalPos)[dimIdx];
 
-            // Turbulent diffusion term (using product rule)
-            dissipationSol -= turbConstants_.sigmaOmega_ * ( (dnutdx(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx])
-                                                          + (nut(globalPos) * dwdx2(globalPos)[dimIdx]));
+            // Turbulent diffusion term
+            dissipationSol -= turbConstants_.sigmaOmega * ( (dnutdx(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx])
+                                                           + (nut(globalPos) * dwdx2(globalPos)[dimIdx]) );
+
+            // Advection term
+            dissipationSol += ( (dvdx(globalPos)[dimIdx][dimIdx] * dissipation(globalPos))
+                              + (velocity(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx]) );
         }
 
         // Production term
         Scalar wProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
-        Scalar WProductionAlternative= 20.0 * turbConstants_.betaK_ * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        Scalar WProductionAlternative= 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
         Scalar wProductionMinimum= std::min(wProductionOriginal, WProductionAlternative);
-        dissipationSol -= turbConstants_.alpha_ * wProductionMinimum * (dissipation(globalPos) / turbulentKineticEnergy(globalPos));
+        dissipationSol -= turbConstants_.alpha * wProductionMinimum * (dissipation(globalPos) / turbulentKineticEnergy(globalPos));
 
         // Destruction term
-        dissipationSol += turbConstants_.betaOmega_ * dissipation(globalPos) * dissipation(globalPos);
+        dissipationSol += turbConstants_.betaOmega * dissipation(globalPos) * dissipation(globalPos);
 
         // CrossDiffusion term
         Scalar kwProduct = 0.0;
@@ -387,7 +450,6 @@ private:
     Scalar density_;
     Scalar kinematicViscosity_;
     TurbulentConstants turbConstants_;
-    GravityVector gravity_;
 };
 
 } // end namespace Dumux
