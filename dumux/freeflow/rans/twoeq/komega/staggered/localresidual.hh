@@ -112,7 +112,7 @@ public:
             productionTerm = min(productionTerm, productionAlternative);
         }
         source[turbulentKineticEnergyEqIdx] += productionTerm;
-        source[dissipationEqIdx] += problem.alpha() * volVars.dissipation() / volVars.turbulentKineticEnergy() * productionTerm;
+        source[dissipationEqIdx] += problem.alpha() * productionTerm * volVars.dissipation() / volVars.turbulentKineticEnergy();
 
         // destruction
         source[turbulentKineticEnergyEqIdx] -= problem.betaK() * volVars.turbulentKineticEnergy() * volVars.dissipation();
@@ -120,11 +120,15 @@ public:
 
         // cross-diffusion term
         Scalar gradientProduct = 0.0;
-        for (unsigned int i = 0; i < ModelTraits::dim(); ++i)
-            gradientProduct += volVars.storedTurbulentKineticEnergyGradient()[i]
-                               * volVars.storedDissipationGradient()[i];
-        if (gradientProduct > 0.0)
-            source[dissipationEqIdx] += 0.125 / volVars.dissipation() * gradientProduct;
+        static const auto enableCrossDiffusionTerm = getParamFromGroup<bool>(problem.paramGroup(), "KOmega.EnableCrossDiffusionTerm", true);
+        if (enableCrossDiffusionTerm)
+        {
+            for (unsigned int i = 0; i < ModelTraits::dim(); ++i)
+                gradientProduct += volVars.storedTurbulentKineticEnergyGradient()[i]
+                                * volVars.storedDissipationGradient()[i];
+            if (gradientProduct > 0.0)
+                source[dissipationEqIdx] += 0.125 / volVars.dissipation() * gradientProduct;
+        }
 
         return source;
     }

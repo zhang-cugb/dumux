@@ -265,7 +265,7 @@ private:
         using std::max;
         // use the Dissipation limiter proposed in wilcox2008
         static const auto enableKOmegaDissipationLimiter
-            = getParam<bool>("KOmega.EnableDissipationLimiter", true);
+            = getParam<bool>("Problem.KOmega.EnableDissipationLimiter", true);
         if (enableKOmegaDissipationLimiter)
             return turbulentKineticEnergy(globalPos) / max(dissipation(globalPos), limitedDissipation(globalPos));
 
@@ -280,7 +280,7 @@ private:
         const Scalar x = globalPos[0];
 
         static const auto enableKOmegaDissipationLimiter
-            = getParam<bool>("KOmega.EnableDissipationLimiter", true);
+            = getParam<bool>("Problem.KOmega.EnableDissipationLimiter", true);
         if (enableKOmegaDissipationLimiter)
         {    const bool inLimiterSpace = limitedDissipation(globalPos) > dissipation(globalPos);
             if (inLimiterSpace)
@@ -289,10 +289,10 @@ private:
                 if (dim > 1)
                 {
                     const Scalar y = globalPos[1];
-                    dnutdx[0] = (4. * sqrt(2.) * (x*x*x - x*y*y*y*y*y*y))
+                    dnutdx[0] = (4. * sqrt(2.) * x * (x*x - y*y*y*y*y*y))
                               / ( 21. * turbConstants_.betaK * pow((x*x*x*x + y*y*y*y) / turbConstants_.betaK, (3./2.)));
 
-                    dnutdx[1] = (4. * sqrt(2.) * y* (x*x*x*x*x*x - y*y))
+                    dnutdx[1] = (4. * sqrt(2.) * y * (x*x*x*x*x*x - y*y))
                               / ( 21. * turbConstants_.betaK * pow((x*x*x*x + y*y*y*y) / turbConstants_.betaK, (3./2.)));
                 }
             }
@@ -381,23 +381,29 @@ private:
         for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
         {
             // advection term (using product rule)
-            turbulentKineticEnergySol += ( (dvdx(globalPos)[dimIdx][dimIdx] * turbulentKineticEnergy(globalPos))
-                                        + (velocity(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx]));
+            turbulentKineticEnergySol += density_ * ( (dvdx(globalPos)[dimIdx][dimIdx] * turbulentKineticEnergy(globalPos))
+                                                    + (velocity(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx]) );
             // Molecular diffusion term
             turbulentKineticEnergySol -= kinematicViscosity_ * dkdx2(globalPos)[dimIdx];
 
             // Turbulent diffusion term (using product rule)
-            turbulentKineticEnergySol -= turbConstants_.sigmaK * ( (dnutdx(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx])
-                                                                 + (nut(globalPos) * dkdx2(globalPos)[dimIdx]));
+            turbulentKineticEnergySol -= density_ *  turbConstants_.sigmaK * ( (dnutdx(globalPos)[dimIdx] * dkdx(globalPos)[dimIdx])
+                                                                             + (nut(globalPos) * dkdx2(globalPos)[dimIdx]));
         }
-        // Production term (plus 2006 K-limiter via P term)
-        Scalar kProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
-        Scalar kProductionAlternative= 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
-        Scalar kProductionMin= std::min(kProductionOriginal, kProductionAlternative);
-        turbulentKineticEnergySol -= kProductionMin;
+
+        // Production term
+        static const auto enableKOmegaProductionLimiter = getParam<bool>("Problem.KOmega.EnableProductionLimiter", false);
+        const Scalar kProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
+        Scalar kProductionAlternative = 0.0;
+        if (enableKOmegaProductionLimiter)
+        {
+            // Production limiter (2006 K-limiter via P term)
+            kProductionAlternative += 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        }
+        turbulentKineticEnergySol -= std::min(kProductionOriginal, kProductionAlternative);
 
         // Destruction term
-        turbulentKineticEnergySol += turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        turbulentKineticEnergySol += turbConstants_.betaK * density_ * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
 
         return turbulentKineticEnergySol;
     }
@@ -408,33 +414,42 @@ private:
         // Advection & Diffusion (using product rule)
         for (unsigned int dimIdx = 0; dimIdx < dim; ++dimIdx)
         {
+            // Advection term
+            dissipationSol += ( (dvdx(globalPos)[dimIdx][dimIdx] * dissipation(globalPos))
+                              + (velocity(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx]) );
+
             // Molecular diffusion term
             dissipationSol -= kinematicViscosity_ * dwdx2(globalPos)[dimIdx];
 
             // Turbulent diffusion term
             dissipationSol -= turbConstants_.sigmaOmega * ( (dnutdx(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx])
                                                            + (nut(globalPos) * dwdx2(globalPos)[dimIdx]) );
-
-            // Advection term
-            dissipationSol += ( (dvdx(globalPos)[dimIdx][dimIdx] * dissipation(globalPos))
-                              + (velocity(globalPos)[dimIdx] * dwdx(globalPos)[dimIdx]) );
         }
 
         // Production term
-        Scalar wProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
-        Scalar WProductionAlternative= 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
-        Scalar wProductionMinimum= std::min(wProductionOriginal, WProductionAlternative);
-        dissipationSol -= turbConstants_.alpha * wProductionMinimum * (dissipation(globalPos) / turbulentKineticEnergy(globalPos));
+        static const auto enableKOmegaProductionLimiter = getParam<bool>("Problem.KOmega.EnableProductionLimiter", false);
+        const Scalar wProductionOriginal= 2.0 * nut(globalPos) * shearStressTensorProduct(globalPos);
+        Scalar WProductionAlternative = 0.0;
+        if (enableKOmegaProductionLimiter)
+        {
+            // Production limiter (2006 K-limiter via P term)
+            WProductionAlternative += 20.0 * turbConstants_.betaK * turbulentKineticEnergy(globalPos) * dissipation(globalPos);
+        }
+        dissipationSol -= turbConstants_.alpha * std::min(wProductionOriginal, WProductionAlternative) * (dissipation(globalPos) / turbulentKineticEnergy(globalPos));
 
         // Destruction term
         dissipationSol += turbConstants_.betaOmega * dissipation(globalPos) * dissipation(globalPos);
 
         // CrossDiffusion term
-        Scalar kwProduct = 0.0;
-        for (unsigned int j = 0; j < dim; ++j)
-            kwProduct +=  dkdx(globalPos)[j] * dwdx(globalPos)[j];
+        static const auto enableCrossDiffusionTerm = getParam<bool>("Problem.KOmega.EnableCrossDiffusionTerm", true);
+        if (enableCrossDiffusionTerm)
+        {
+            Scalar kwProduct = 0.0;
+            for (unsigned int j = 0; j < dim; ++j)
+                kwProduct +=  dkdx(globalPos)[j] * dwdx(globalPos)[j];
 
-        dissipationSol -= sigma_d(kwProduct) * kwProduct / dissipation(globalPos);
+            dissipationSol -= sigma_d(kwProduct) * kwProduct / dissipation(globalPos);
+        }
 
         return dissipationSol;
     }

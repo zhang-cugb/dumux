@@ -1,12 +1,15 @@
 [Grid]
 UpperRight = 1 1
-Cells = 4 4
+Cells = 5 5
 
 [Problem]
 Name = test_ff_analytic_rans
-EnableGravity = false
 PrintL2Error = true
+EnableGravity = true
 EnableInertiaTerms = true
+KOmega.EnableProductionLimiter = true
+KOmega.EnableDissipationLimiter = true
+KOmega.EnableCrossDiffusionTerm = true
 
 [Component]
 LiquidDensity  = 1.0 # kg/m^3
@@ -16,10 +19,6 @@ Temperature = 283.15 # [K]
 [Newton]
 MaxSteps = 100
 MaxRelativeShift = 1e-6
-
-[KOmega]
-EnableProductionLimiter = true
-EnableDissipationLimiter = true
 
 [Vtk]
 WriteFaceData = false
