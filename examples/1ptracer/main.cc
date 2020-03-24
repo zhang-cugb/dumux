@@ -21,9 +21,10 @@
 // ### Includes
 #include <config.h>
 
-// We include both problems in the main file, the `problem_1p.hh` and the `problem_tracer.hh`.
+// This includes the `TypeTags` and properties to be used for the single-phase
+// and the tracer simulations.
 #include "properties_1p.hh"
-#include "problem_tracer.hh"
+#include "properties_tracer.hh"
 
 // Further, we include a standard header file for C++, to get time and date information
 #include <ctime>
