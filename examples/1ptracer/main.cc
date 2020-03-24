@@ -22,7 +22,7 @@
 #include <config.h>
 
 // We include both problems in the main file, the `problem_1p.hh` and the `problem_tracer.hh`.
-#include "problem_1p.hh"
+#include "properties_1p.hh"
 #include "problem_tracer.hh"
 
 // Further, we include a standard header file for C++, to get time and date information
