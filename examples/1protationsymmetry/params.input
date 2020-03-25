@@ -1,0 +1,18 @@
+[Problem]
+Name = rotationsymmetry
+Source = -10.0
+WellPressure = 1e5
+EnableGravity = 0 # disable gravity
+
+[Grid]
+LowerLeft = 0.05
+UpperRight = 1
+Cells = 100
+RefinementSteps = 5
+
+[SpatialParams]
+Permeability = 1e-10 # [m^2]
+
+[Component]
+LiquidKinematicViscosity = 1e-6
+LiquidDensity = 1e3
