@@ -44,29 +44,6 @@ namespace Dumux {
  */
 class InteractionVolumeAssemblerHelper
 {
-    // Helper structs to detect if matrix has resize function
-    struct HasMatrixResize
-    {
-        template<class M>
-        auto operator()(const M& m) -> decltype(std::declval<M>().resize(0, 0))
-        {}
-    };
-
-    // Helper structs to detect if vector has resize function
-    struct HasVectorResize
-    {
-        template<class V>
-        auto operator()(const V& v) -> decltype(std::declval<V>().resize(0))
-        {}
-    };
-
-    template<class Matrix>
-    static constexpr auto matrixHasResizeFunction()
-    { return decltype( isValid(HasMatrixResize())(std::declval<Matrix>()) )::value; }
-
-    template<class Vector>
-    static constexpr auto vectorHasResizeFunction()
-    { return decltype( isValid(HasVectorResize())(std::declval<Vector>()) )::value; }
 
 public:
     /*!
@@ -215,37 +192,27 @@ public:
         return result;
     }
 
-    //! resizes a matrix to the given sizes (specialization for dynamic matrix type)
-    template< class Matrix,
-              class size_type,
-              std::enable_if_t<matrixHasResizeFunction<Matrix>(), int> = 0 >
+    //! resizes a matrix to the given sizes if it is resizable (otherwise nothing is done)
+    template<class Matrix, class size_type>
     static void resizeMatrix(Matrix& M, size_type rows, size_type cols)
     {
-        M.resize(rows, cols);
+        auto hasMatrixResize = isValid([](Matrix&& m) -> decltype(m.resize(1, 1)) {});
+        if constexpr (hasMatrixResize(M))
+        {
+            M.resize(rows, cols);
+        }
     }
 
-    //! resizes a matrix to the given sizes (specialization for static matrix type - do nothing)
-    template< class Matrix,
-              class size_type,
-              std::enable_if_t<!matrixHasResizeFunction<Matrix>(), int> = 0 >
-    static void resizeMatrix(Matrix& M, size_type rows, size_type cols)
-    {}
-
-    //! resizes a vector to the given size (specialization for dynamic matrix type)
-    template< class Vector,
-              class size_type,
-              std::enable_if_t<vectorHasResizeFunction<Vector>(), int> = 0 >
+    //! resizes a vector to the given size if it is resizable (otherwise nothing is done)
+    template<class Vector, class size_type>
     static void resizeVector(Vector& v, size_type size)
     {
-        v.resize(size);
+        auto hasResize = isValid([](Vector&& v) -> decltype(v.resize(1)) {});
+        if constexpr (hasResize(v))
+        {
+            v.resize(size);
+        }
     }
-
-    //! resizes a vector to the given size (specialization for static vector type - do nothing)
-    template< class Vector,
-              class size_type,
-              std::enable_if_t<!vectorHasResizeFunction<Vector>(), int> = 0 >
-    static void resizeVector(Vector& v, size_type rows)
-    {}
 };
 
 } // end namespace Dumux
