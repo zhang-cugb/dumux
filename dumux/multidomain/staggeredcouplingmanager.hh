@@ -84,10 +84,6 @@ public:
      * \brief returns an iteratable container of all indices of degrees of freedom of domain j
      *        that couple with / influence the element residual of the given element of domain i
      *
-     * \param domainI the domain index of domain i
-     * \param elementI the coupled element of domain í
-     * \param domainJ the domain index of domain j
-
      * \note  this is a specialization for getting the indices of the coupled staggered face dofs
      */
     const CouplingStencil& couplingStencil(Dune::index_constant<cellCenterIdx> domainI,
@@ -102,11 +98,6 @@ public:
     /*!
      * \brief returns an iteratable container of all indices of degrees of freedom of domain j
      *        that couple with / influence the residual of the given subcontrolvolume face of domain i
-     *
-     * \param domainI the domain index of domain i
-     * \param scvfI the coupled subcontrolvolume face of domain í
-     * \param domainJ the domain index of domain j
-
      * \note  This function has to be implemented by all coupling managers for all combinations of i and j
      */
     template<std::size_t i, std::size_t j>
@@ -125,10 +116,6 @@ public:
      * \brief returns an iteratable container of all indices of degrees of freedom of domain j
      *        that couple with / influence the residual of the given subcontrolvolume face of domain i
      *
-     * \param domainI the domain index of domain i
-     * \param scvfI the coupled subcontrolvolume face of domain í
-     * \param domainJ the domain index of domain j
-
      * \note this is a specialization for getting the indices of the coupled cellcentered dofs
      */
     const CouplingStencil& couplingStencil(Dune::index_constant<faceIdx> domainI,

@@ -22,7 +22,16 @@
  *
  * \brief A single-phase, isothermal one-equation turbulence model by Spalart-Allmaras
  *
- * \copydoc RANSModel
+ * This model implements a single-phase, isothermal Reynolds-Averaged
+ * Navier-Stokes model, solving the <B> momentum balance equation </B>
+ * \f[
+ \frac{\partial (\varrho \textbf{v})}{\partial t} + \nabla \cdot (\varrho \textbf{v} \textbf{v}^{\textup{T}}) = \nabla \cdot (\mu_\textrm{eff} (\nabla \textbf{v} + \nabla \textbf{v}^{\textup{T}}))
+   - \nabla p + \varrho \textbf{g} - \textbf{f}
+ * \f]
+ * The effective viscosity is composed of the fluid and the eddy viscosity:
+ * \f[
+ *    \mu_\textrm{eff} = \mu + \mu_\textrm{t}
+ * \f].
  *
  * This model, published by Spalart and Allmaras 1992 \cite Spalart1992a,
  * uses one additional PDE for a working variable \f$ \tilde{\nu} \f$.

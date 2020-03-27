@@ -22,7 +22,16 @@
  *
  * \brief A single-phase, isothermal k-omega 2-Eq. model
  *
- * \copydoc RANSModel
+ * This model implements a single-phase, isothermal Reynolds-Averaged
+ * Navier-Stokes model, solving the <B> momentum balance equation </B>
+ * \f[
+ \frac{\partial (\varrho \textbf{v})}{\partial t} + \nabla \cdot (\varrho \textbf{v} \textbf{v}^{\textup{T}}) = \nabla \cdot (\mu_\textrm{eff} (\nabla \textbf{v} + \nabla \textbf{v}^{\textup{T}}))
+   - \nabla p + \varrho \textbf{g} - \textbf{f}
+ * \f]
+ * The effective viscosity is composed of the fluid and the eddy viscosity:
+ * \f[
+ *    \mu_\textrm{eff} = \mu + \mu_\textrm{t}
+ * \f].
  *
  * Two additional PDEs, one for the turbulentKineticEnergy (k) and a second for the dissipation (omega)
  * are used to calculate the eddy viscosity for this model.

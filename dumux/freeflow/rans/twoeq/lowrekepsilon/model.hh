@@ -22,7 +22,16 @@
  *
  * \brief A single-phase, isothermal low-Reynolds k-epsilon model
  *
- * \copydoc RANSModel
+ * This model implements a single-phase, isothermal Reynolds-Averaged
+ * Navier-Stokes model, solving the <B> momentum balance equation </B>
+ * \f[
+ \frac{\partial (\varrho \textbf{v})}{\partial t} + \nabla \cdot (\varrho \textbf{v} \textbf{v}^{\textup{T}}) = \nabla \cdot (\mu_\textrm{eff} (\nabla \textbf{v} + \nabla \textbf{v}^{\textup{T}}))
+   - \nabla p + \varrho \textbf{g} - \textbf{f}
+ * \f]
+ * The effective viscosity is composed of the fluid and the eddy viscosity:
+ * \f[
+ *    \mu_\textrm{eff} = \mu + \mu_\textrm{t}
+ * \f].
  *
  * The low-Reynolds k-epsilon models calculate the eddy viscosity with two additional PDEs,
  * one for the turbulent kinetic energy (k) and for the dissipation (\f$ \varepsilon \f$).

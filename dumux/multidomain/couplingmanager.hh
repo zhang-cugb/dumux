@@ -133,14 +133,6 @@ public:
      * \ingroup MultiDomain
      * \brief updates all data and variables that are necessary to evaluate the residual of the element of domain i
      *        this is called whenever one of the primary variables that the element residual depends on changes in domain j
-     *
-     * \param domainI the domain index of domain i
-     * \param localAssemblerI the local assembler assembling the element residual of an element of domain i
-     * \param domainJ the domain index of domain j
-     * \param dofIdxGlobalJ the index of the degree of freedom of domain j whose solution changed
-     * \param priVarsJ the new solution at the degree of freedom of domain j with index dofIdxGlobalJ
-     * \param pvIdxJ the index of the primary variable of domain j which has been updated
-     *
      * \note this concerns all data that is used in the evaluation of the element residual and depends on
      *       the primary variables at the degree of freedom location with index dofIdxGlobalJ
      * \note  the element whose residual is to be evaluated can be retrieved from the local assembler

@@ -62,7 +62,6 @@ public:
     /*!
      * \brief Get the main component of a given phase if possible
      *
-     * \param phaseIdx The index of the fluid phase to consider
      * \todo Unfortunately we currently still have the assumption in some volume variables (e.g. 1pnc, 2pnc)
      *       that the main component index of a phase is equal to the phase index of that phase. This means
      *       changing this only works if the volume variables are written accordingly.
@@ -78,8 +77,6 @@ public:
      *
      * Compressible means that the partial derivative of the density
      * to the fluid pressure is always larger than zero.
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     template<class T = Implementation>
     static constexpr bool isCompressible(int phaseIdx)
@@ -101,16 +98,12 @@ public:
     /*!
      * \brief Returns true if and only if a fluid phase is assumed to
      *        have a constant viscosity.
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static constexpr bool viscosityIsConstant(int phaseIdx)
     { return false; }
 
     /*!
      * \brief Return the human readable name of a fluid phase
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static std::string phaseName(int phaseIdx)
     { return "DefaultPhaseName"; }
@@ -127,8 +120,6 @@ public:
 
     /*!
      * \brief Calculate the density \f$\mathrm{[kg/m^3]}\f$ of a fluid phase
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar density(const FluidState &fluidState,
@@ -139,9 +130,6 @@ public:
 
     /*!
      * \brief Calculate the density \f$\mathrm{[kg/m^3]}\f$ of a fluid phase
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar density(const FluidState &fluidState,
@@ -153,8 +141,6 @@ public:
 
     /*!
      * \brief Calculate the molar density \f$\mathrm{[mol/m^3]}\f$ of a fluid phase
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState,
@@ -165,9 +151,6 @@ public:
 
     /*!
      * \brief Calculate the molar density \f$\mathrm{[mol/m^3]}\f$ of a fluid phase
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState,
@@ -188,10 +171,6 @@ public:
      * \f[
      f^\kappa_\alpha = \phi^\kappa_\alpha\;x^\kappa_\alpha\;p_\alpha
      * \f]
-     *
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
-     * \param compIdx Index of the component
      */
     template <class FluidState>
     static Scalar fugacityCoefficient(const FluidState &fluidState,
@@ -212,11 +191,6 @@ public:
      * \f[
      f^\kappa_\alpha = \phi^\kappa_\alpha\;x^\kappa_\alpha\;p_\alpha
      * \f]
-     *
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
-     * \param compIdx Index of the component
      */
     template <class FluidState>
     static Scalar fugacityCoefficient(const FluidState &fluidState,
@@ -229,8 +203,6 @@ public:
 
     /*!
      * \brief Calculate the dynamic viscosity of a fluid phase \f$\mathrm{[Pa*s]}\f$
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
@@ -241,9 +213,6 @@ public:
 
     /*!
      * \brief Calculate the dynamic viscosity of a fluid phase \f$\mathrm{[Pa*s]}\f$
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
@@ -256,9 +225,6 @@ public:
     /*!
      * \brief Calculate the binary molecular diffusion coefficient for
      *        a component in a fluid phase \f$\mathrm{[mol^2 * s / (kg*m^3)]}\f$
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
-     * \param compIdx Index of the component
      * Molecular diffusion of a component \f$\mathrm{\kappa}\f$ is caused by a
      * gradient of the chemical potential and follows the law
      *
@@ -285,10 +251,6 @@ public:
     /*!
      * \brief Calculate the binary molecular diffusion coefficient for
      *        a component in a fluid phase \f$\mathrm{[mol^2 * s / (kg*m^3)]}\f$
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
-     * \param compIdx Index of the component
      * Molecular diffusion of a component \f$\mathrm{\kappa}\f$ is caused by a
      * gradient of the chemical potential and follows the law
      *
@@ -317,10 +279,6 @@ public:
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
      *        \f$\mathrm{i}\f$ and \f$\mathrm{j}\f$ in this phase.
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
-     * \param compIIdx Index of the component i
-     * \param compJIdx Index of the component j
      */
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
@@ -336,11 +294,6 @@ public:
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
      *        \f$\mathrm{i}\f$ and \f$\mathrm{j}\f$ in this phase.
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
-     * \param compIIdx Index of the component i
-     * \param compJIdx Index of the component j
      */
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
@@ -356,8 +309,6 @@ public:
     /*!
      * \brief Given a phase's composition, temperature, pressure and
      *        density, calculate its specific enthalpy \f$\mathrm{[J/kg]}\f$.
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
@@ -369,9 +320,6 @@ public:
     /*!
      * \brief Given a phase's composition, temperature, pressure and
      *        density, calculate its specific enthalpy \f$\mathrm{[J/kg]}\f$.
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
@@ -383,8 +331,6 @@ public:
 
     /*!
      * \brief Thermal conductivity \f$\lambda_\alpha \f$ of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
-     * \param fluidState The fluid state
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
@@ -395,9 +341,6 @@ public:
 
     /*!
      * \brief Thermal conductivity \f$\lambda_\alpha \f$ of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
-     * \param fluidState The fluid state
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      */
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
@@ -409,9 +352,6 @@ public:
 
     /*!
      * \brief Specific isobaric heat capacity \f$c_{p,\alpha}\f$ of a fluid phase \f$\mathrm{[J/(kg*K)]}\f$.
-     *
-     * \param fluidState represents all relevant thermodynamic quantities of a fluid system
-     * \param phaseIdx Index of the fluid phase
      *
      * Given a fluid state, an up-to-date parameter cache and a phase index, this method
      * computes the isobaric heat capacity \f$c_{p,\alpha}\f$ of the fluid phase. The isobaric
@@ -429,10 +369,6 @@ public:
 
     /*!
      * \brief Specific isobaric heat capacity \f$c_{p,\alpha}\f$ of a fluid phase \f$\mathrm{[J/(kg*K)]}\f$.
-     *
-     * \param fluidState represents all relevant thermodynamic quantities of a fluid system
-     * \param paramCache mutable parameters
-     * \param phaseIdx Index of the fluid phase
      *
      * Given a fluid state, an up-to-date parameter cache and a phase index, this method
      * computes the isobaric heat capacity \f$c_{p,\alpha}\f$ of the fluid phase. The isobaric

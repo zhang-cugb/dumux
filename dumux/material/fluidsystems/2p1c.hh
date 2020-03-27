@@ -64,8 +64,6 @@ public:
     ****************************************/
     /*!
      * \brief Return the human readable name of a fluid phase
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static std::string phaseName(int phaseIdx)
     {
@@ -86,8 +84,6 @@ public:
 
     /*!
      * \brief Return whether a phase is gaseous
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static constexpr bool isGas(int phaseIdx)
     {
@@ -106,8 +102,6 @@ public:
      * this function should return, it is safe to return false. The
      * only damage done will be (slightly) increased computation times
      * in some cases.
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static constexpr bool isIdealMixture(int phaseIdx)
     {
@@ -124,8 +118,6 @@ public:
      *
      * Compressible means that the partial derivative of the density
      * to the fluid pressure is always larger than zero.
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static constexpr bool isCompressible(int phaseIdx)
     {
@@ -140,8 +132,6 @@ public:
     /*!
      * \brief Returns true if and only if a fluid phase is assumed to
      *        be an ideal gas.
-     *
-     * \param phaseIdx The index of the fluid phase to consider
      */
     static constexpr bool isIdealGas(int phaseIdx)
     {
@@ -160,7 +150,6 @@ public:
     /*!
      * \brief Return the human readable name of a component
      *
-     * \param compIdx The index of the component to consider
      */
     static std::string componentName(int compIdx)
     {
@@ -170,9 +159,7 @@ public:
 
     /*!
      * \brief Return the molar mass of a component in [kg/mol].
-     *
-     * \param compIdx The index of the component to consider
-     */
+    */
     static Scalar molarMass(int compIdx)
     {
         assert(0 <= compIdx && compIdx < numComponents);
@@ -192,8 +179,6 @@ public:
 
     /*!
      * \brief Critical pressure of a component [Pa].
-     *
-     * \param compIdx The index of the component to consider
      */
     static Scalar criticalPressure(int compIdx)
     {
@@ -203,8 +188,6 @@ public:
 
     /*!
      * \brief Molar volume of a component at the critical point [m^3/mol].
-     *
-     * \param compIdx The index of the component to consider
      */
     static Scalar criticalMolarVolume(int compIdx)
     {
@@ -215,8 +198,6 @@ public:
 
     /*!
      * \brief The acentric factor of a component [].
-     *
-     * \param compIdx The index of the component to consider
      */
     static Scalar acentricFactor(int compIdx)
     {
@@ -247,13 +228,6 @@ public:
     /*!
      * \brief Initialize the fluid system's static parameters using
      *        problem specific temperature and pressure ranges
-     *
-     * \param tempMin The minimum temperature used for tabulation of water [K]
-     * \param tempMax The maximum temperature used for tabulation of water [K]
-     * \param nTemp The number of ticks on the temperature axis of the  table of water
-     * \param pressMin The minimum pressure used for tabulation of water [Pa]
-     * \param pressMax The maximum pressure used for tabulation of water [Pa]
-     * \param nPress The number of ticks on the pressure axis of the  table of water
      */
     static void init(Scalar tempMin, Scalar tempMax, unsigned nTemp,
                      Scalar pressMin, Scalar pressMax, unsigned nPress)
@@ -267,9 +241,6 @@ public:
 
     /*!
      * \brief Calculate the density [kg/m^3] of a fluid phase
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::density;
     template <class FluidState>
@@ -318,9 +289,6 @@ public:
 
     /*!
      * \brief Calculate the dynamic viscosity of a fluid phase [Pa*s]
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::viscosity;
     template <class FluidState>
@@ -343,9 +311,6 @@ public:
 
     /*!
      * \brief calculate the temperature of vapor at a given pressure on the vapor pressure curve.
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     template <class FluidState>
     static Scalar vaporTemperature(const FluidState &fluidState,
@@ -379,10 +344,6 @@ public:
      f^\kappa_\alpha := \exp\left\{\frac{\zeta^\kappa_\alpha}{k_B T_\alpha} \right\}
      \f]
      * where \f$k_B = 1.380\cdot10^{-23}\;J/K\f$ is the Boltzmann constant.
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
-     * \param compIdx The index of the component to consider
      */
     using Base::fugacityCoefficient;
     template <class FluidState>
@@ -413,10 +374,6 @@ public:
     /*!
      * \brief Calculate the molecular diffusion coefficient for a
      *        component in a fluid phase [mol^2 * s / (kg*m^3)]
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
-     * \param compIdx The index of the component to consider
      */
     using Base::diffusionCoefficient;
     template <class FluidState>
@@ -432,11 +389,6 @@ public:
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient for components
      *        \f$i\f$ and \f$j\f$ in this phase.
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
-     * \param compIIdx The index of the first component to consider
-     * \param compJIdx The index of the second component to consider
      */
     using Base::binaryDiffusionCoefficient;
     template <class FluidState>
@@ -449,9 +401,6 @@ public:
 
     /*!
      * \brief Calculate specific enthalpy [J/kg].
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::enthalpy;
     template <class FluidState>
@@ -477,9 +426,6 @@ public:
      * \brief Thermal conductivity of a fluid phase [W/(m K)].
      *
      * Use the conductivity of vapor and liquid water at 100°C
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::thermalConductivity;
     template <class FluidState>
@@ -503,9 +449,6 @@ public:
     /*!
      * \brief Specific isobaric heat capacity of a fluid phase.
      *        \f$\mathrm{[J/kg / K]}\f$.
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::heatCapacity;
     template <class FluidState>

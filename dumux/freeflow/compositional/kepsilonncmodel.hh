@@ -22,7 +22,41 @@
  *
  * \brief A single-phase, multi-component k-epsilon model
  *
- * \copydoc dumux/freeflow/compositional/navierstokesncmodel.hh
+ * This model implements a single-phase, isothermal Navier-Stokes model, solving the <B> momentum balance equation </B>
+ * \f[
+ \frac{\partial (\varrho \textbf{v})}{\partial t} + \nabla \cdot (\varrho \textbf{v} \textbf{v}^{\textup{T}}) = \nabla \cdot (\mu (\nabla \textbf{v} + \nabla \textbf{v}^{\textup{T}}))
+   - \nabla p + \varrho \textbf{g} - \textbf{f}
+ * \f]
+ * By setting the runtime parameter <code>Problem.EnableInertiaTerms</code> to <code>false</code> the Stokes
+ * equation can be solved. In this case the term
+ * \f[
+ *    \nabla \cdot (\varrho \textbf{v} \textbf{v}^{\textup{T}})
+ * \f]
+ * is neglected.
+ *
+ * The system is closed by a <B> component mass/mole balance equation </B> for each component \f$\kappa\f$:
+ * \f[
+ *    \frac{\partial \left(\varrho X^\kappa\right)}{\partial t}
+ *    + \nabla \cdot \left( \varrho {\boldsymbol{v}} X^\kappa
+ *    - (D^\kappa + D_\text{t}) \varrho \textbf{grad}\, X^\kappa \right)
+ *    - q^\kappa = 0
+ * \f]
+ *
+ * Alternatively, one component balance equation can be replace by a <B> total mass/mole balance equation </B>:
+ * \f[
+ *    \frac{\partial \varrho_g}{\partial t}
+ *    + \nabla \cdot \left(
+ *        \varrho {\boldsymbol{v}}
+ *        - \sum_\kappa (D^\kappa + D_\text{t}) \varrho \textbf{grad}\, X^\kappa
+ *      \right)
+ *    - q = 0
+ * \f]
+ *
+ * The eddy diffusivity \f$ D_\text{t} \f$ is related to the eddy viscosity \f$ \nu_\text{t} \f$
+ * by the turbulent Schmidt number, for Navier-Stokes models \f$ D_\text{t} = 0 \f$.
+ * \f[ D_\text{t} = \frac{\nu_\text{t}}{\mathrm{Sc}_\text{t}} \f]
+ *
+ * So far, only the staggered grid spatial discretization (for structured grids) is available.
  */
 
 #ifndef DUMUX_KEPSILON_NC_MODEL_HH
