@@ -27,8 +27,6 @@
 
 #include <type_traits>
 
-#include <dune/common/deprecated.hh>
-
 #include <dumux/common/typetraits/isvalid.hh>
 
 namespace Dumux {
@@ -95,7 +93,8 @@ public:
 
 template<class P, class E, class FVEG, class EVV, class EFVC,
          typename std::enable_if_t<!decltype(isValid(HasNewNeumannIF<E, FVEG, EVV, EFVC>()).template check<P>())::value, int> = 0>
-auto DUNE_DEPRECATED_MSG("Use new neumann() interface (see common/fvproblem.hh) that additionally receives the element flux variables cache in your problem!. Will be removed after 3.1 release")
+[[deprecated("Use new neumann() interface (see common/fvproblem.hh) that additionally receives the element flux variables cache in your problem!. Will be removed after 3.1 release")]]
+auto
 neumann(const P& problem,
         const E& element,
         const FVEG& fvGeometry,
