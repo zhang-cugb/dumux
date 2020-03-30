@@ -6,5 +6,5 @@ iofields.hh
 localresidual.hh
 model.hh
 problem.hh
-volumevariables.hh
+shallowwatervolumevariables.hh
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dumux/freeflow/shallowwater)

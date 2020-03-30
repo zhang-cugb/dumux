@@ -27,7 +27,7 @@
 #include <dune/grid/common/gridenums.hh>
 #include <dumux/porousmediumflow/2p/sequential/diffusion/properties.hh>
 #include <dumux/porousmediumflow/sequential/cellcentered/mpfa/properties.hh>
-#include "3dtransmissibilitycalculator.hh"
+#include "zzz3dtransmissibilitycalculator.hh"
 
 namespace Dumux {
 

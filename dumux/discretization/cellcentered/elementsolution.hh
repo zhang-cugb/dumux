@@ -105,10 +105,6 @@ private:
     PrimaryVariables priVars_;
 };
 
-/*!
- * \ingroup CCDiscretization
- * \brief  Make an element solution for cell-centered schemes
- */
 template<class Element, class SolutionVector, class GridGeometry>
 auto elementSolution(const Element& element, const SolutionVector& sol, const GridGeometry& gg)
 -> std::enable_if_t<GridGeometry::discMethod == DiscretizationMethod::cctpfa ||
@@ -121,10 +117,6 @@ auto elementSolution(const Element& element, const SolutionVector& sol, const Gr
     return CCElementSolution<typename GridGeometry::LocalView, PrimaryVariables>(element, sol, gg);
 }
 
-/*!
- * \ingroup CCDiscretization
- * \brief  Make an element solution for cell-centered schemes
- */
 template<class Element, class ElementVolumeVariables, class FVElementGeometry>
 auto elementSolution(const Element& element, const ElementVolumeVariables& elemVolVars, const FVElementGeometry& gg)
 -> std::enable_if_t<FVElementGeometry::GridGeometry::discMethod == DiscretizationMethod::cctpfa ||
@@ -135,11 +127,6 @@ auto elementSolution(const Element& element, const ElementVolumeVariables& elemV
     return CCElementSolution<FVElementGeometry, PrimaryVariables>(element, elemVolVars, gg);
 }
 
-/*!
- * \ingroup CCDiscretization
- * \brief  Make an element solution for cell-centered schemes
- * \note This is e.g. used to contruct an element solution at Dirichlet boundaries
- */
 template<class FVElementGeometry, class PrimaryVariables>
 auto elementSolution(PrimaryVariables&& priVars)
 -> std::enable_if_t<FVElementGeometry::GridGeometry::discMethod == DiscretizationMethod::cctpfa ||
@@ -149,11 +136,6 @@ auto elementSolution(PrimaryVariables&& priVars)
     return CCElementSolution<FVElementGeometry, PrimaryVariables>(std::move(priVars));
 }
 
-/*!
- * \ingroup CCDiscretization
- * \brief  Make an element solution for cell-centered schemes
- * \note This is e.g. used to contruct an element solution at Dirichlet boundaries
- */
 template<class FVElementGeometry, class PrimaryVariables>
 auto elementSolution(const PrimaryVariables& priVars)
 -> std::enable_if_t<FVElementGeometry::GridGeometry::discMethod == DiscretizationMethod::cctpfa ||

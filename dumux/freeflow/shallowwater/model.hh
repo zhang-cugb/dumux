@@ -69,7 +69,7 @@
 #include <dumux/flux/fluxvariablescaching.hh>
 
 #include "localresidual.hh"
-#include "volumevariables.hh"
+#include "shallowwatervolumevariables.hh"
 #include "fluxvariables.hh"
 #include "indices.hh"
 #include "iofields.hh"

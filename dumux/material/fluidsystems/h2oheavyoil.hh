@@ -566,9 +566,6 @@ public:
      * \brief Thermal conductivity of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
      *
      * Use the conductivity of water (wPhase and gPhase) and oil (nPhase) as a first approximation.
-     *
-     * \param fluidState An arbitrary fluid state
-     * \param phaseIdx The index of the fluid phase to consider
      */
     using Base::thermalConductivity;
     template <class FluidState>

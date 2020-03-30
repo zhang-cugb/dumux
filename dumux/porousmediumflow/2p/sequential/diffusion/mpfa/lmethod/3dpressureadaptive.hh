@@ -30,7 +30,7 @@
 // dumux environment
 #include "3dpressure.hh"
 #include "3dinteractionvolumecontaineradaptive.hh"
-#include "3dtransmissibilitycalculator.hh"
+#include "zzz3dtransmissibilitycalculator.hh"
 
 namespace Dumux {
 

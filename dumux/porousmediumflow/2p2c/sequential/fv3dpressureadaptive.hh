@@ -39,7 +39,7 @@
 // include pressure model from Markus
 #include <dumux/porousmediumflow/sequential/cellcentered/mpfa/properties.hh>
 #include <dumux/porousmediumflow/2p2c/sequential/fvmpfal3dinteractionvolumecontaineradaptive.hh>
-#include <dumux/porousmediumflow/2p/sequential/diffusion/mpfa/lmethod/3dtransmissibilitycalculator.hh>
+#include <dumux/porousmediumflow/2p/sequential/diffusion/mpfa/lmethod/zzz3dtransmissibilitycalculator.hh>
 
 namespace Dumux {
 namespace Properties {
