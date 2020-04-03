@@ -65,31 +65,31 @@
 // The gridmanager constructs a grid from the information in the input or grid file. There is a specification for the different supported grid managers.
 #include <dumux/io/grid/gridmanager.hh>
 
+// ### Beginning of the main function
 int main(int argc, char** argv) try
 {
     using namespace Dumux;
 
-    using TypeTag = Properties::TTag::TYPETAG;
+    // Convenience aliases for the type tag of the problem.
+    using TypeTag = Properties::TTag::OnePRotSymBox;
 
-    // initialize MPI, finalize is done automatically on exit
+    // We initialize MPI. Finalization is done automatically on exit.
     const auto& mpiHelper = Dune::MPIHelper::instance(argc, argv);
 
-    // print dumux start message
+    // We print the dumux start message.
     if (mpiHelper.rank() == 0)
         DumuxMessage::print(/*firstCall=*/true);
 
-    ////////////////////////////////////////////////////////////
-    // parse the command line arguments and input file
-    ////////////////////////////////////////////////////////////
-
-    // parse command line arguments
+    // We parse the command line arguments.
     Parameters::init(argc, argv);
 
-    //////////////////////////////////////////////////////////////////////
-    // try to create a grid (from the given grid file or the input file)
-    /////////////////////////////////////////////////////////////////////
-    using Grid = GetPropType<TypeTag, Properties::Grid>;
-    GridManager<Grid> gridManager;
+    // ### Create the grid
+    // The `GridManager` class creates the grid from information given in the input file.
+    // This can either be a grid file, or in the case of structured grids, by specifying the coordinates
+    // of the corners of the grid and the number of cells to be used to discretize each spatial direction.
+    // Here, we solve both the single-phase and the tracer problem on the same grid.
+    // Hence, the grid is only created once using the grid type defined by the type tag of the 1p problem.
+    GridManager<GetPropType<TypeTag, Properties::Grid>> gridManager;
     gridManager.init();
 
     // start timer
@@ -104,38 +104,46 @@ int main(int argc, char** argv) try
     std::vector<Scalar> l2Errors(numRefinements, 0.0);
     for(int i = 0; i < numRefinements; i++)
     {
-        // we compute on the leaf grid view
+        // We compute on the leaf grid view.
         const auto& leafGridView = gridManager.grid().leafGridView();
 
-        // create the finite volume grid geometry
+        // ### Set-up and solving of the 1p rotation symmetry problem
+        // In the following section, we set up and solve the problem. As the result of this problem, we obtain the pressure distribution in the domain.
+        // #### Set-up
+        // We create and initialize the finite volume grid geometry, the problem, the linear system, including the jacobian matrix, the residual and the solution vector and the gridvariables.
+        // We need the finite volume geometry to build up the subcontrolvolumes (scv) and subcontrolvolume faces (scvf) for each element of the grid partition.
         auto gridGeometry = std::make_shared<GridGeometry>(leafGridView);
         gridGeometry->update();
 
-        // the problem (boundary conditions)
+        // In the problem, we define the boundary and initial conditions.
         using Problem = GetPropType<TypeTag, Properties::Problem>;
         auto problem = std::make_shared<Problem>(gridGeometry);
 
-        // the solution vector
+        // The solution vector containing the pressure values
         using SolutionVector = GetPropType<TypeTag, Properties::SolutionVector>;
         SolutionVector x(gridGeometry->numDofs());
 
-        // the grid variables
+        // The grid variables store variables (primary and secondary variables) on sub-control volumes and faces (volume and flux variables).
         using GridVariables = GetPropType<TypeTag, Properties::GridVariables>;
         auto gridVariables = std::make_shared<GridVariables>(problem, gridGeometry);
         gridVariables->init(x);
 
-        // create assembler & linear solver
+        // #### Assembling the linear system
+        // We create the assembler.
         using Assembler = FVAssembler<TypeTag, DiffMethod::analytic>;
         auto assembler = std::make_shared<Assembler>(problem, gridGeometry, gridVariables);
 
+        // #### Solution
+        // We set the linear solver "UMFPack" as the linear solver. Afterwards we solve the linear system.
+        // The linear system of equations is solved
         using LinearSolver = UMFPackBackend;
         auto linearSolver = std::make_shared<LinearSolver>();
-
-        // solver the linear problem
         LinearPDESolver<Assembler, LinearSolver> solver(assembler,  linearSolver);
         solver.setVerbose(0);
         solver.solve(x);
 
+        // #### Post-processing and output
+        // We calculate the L2 errors using the numerical solution
         l2Errors[i] = problem->calculateL2Error(x, orderQuadratureRule);
         std::cout.precision(8);
         std::cout << "L2 error for "
@@ -148,6 +156,7 @@ int main(int argc, char** argv) try
                   << std::endl;
 
 
+        // The vtk file is written on the finest grid.
         if(i == numRefinements-1)
         {
             // output result to vtk
@@ -160,27 +169,11 @@ int main(int argc, char** argv) try
             vtkWriter.write(0.0);
         }
 
+        // Globally refine the grid and repeate the solution procedure
         gridManager.grid().globalRefine(1);
-
     }
 
-//    for(int i = 0; i < numRefinements; i++)
-//    {
-//
-//        std::cout.precision(8);
-//        std::cout << "L2 error for "
-//                  << std::setw(6) << this->gridGeometry().numDofs()
-//                  << " dofs: "
-//                  << std::scientific
-//                  << l2Errors[i];
-//
-//        if(i > 0)
-//            std::cout << " rate: "
-//                      << std::log(l2Errors[i]/l2Errors[i-1])/(std::log(0.5))
-//                      << std::endl;
-//    }
-
-
+    // We stop the timer and display the total time of the simulation as well as the cumulative CPU time.
     timer.stop();
 
     const auto& comm = Dune::MPIHelper::getCollectiveCommunication();
@@ -189,12 +182,15 @@ int main(int argc, char** argv) try
                   << comm.size() << " processes.\n"
                   << "The cumulative CPU time was " << timer.elapsed()*comm.size() << " seconds.\n";
 
+    // ### Final Output, print parameters
     if (mpiHelper.rank() == 0)
         Parameters::print();
 
     return 0;
-
 }
+// ### Exception handling
+// In this part of the main file we catch and print possible exceptions that could
+// occur during the simulation.
 catch (Dumux::ParameterException &e)
 {
     std::cerr << std::endl << e << " ---> Abort!" << std::endl;

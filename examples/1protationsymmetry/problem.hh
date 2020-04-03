@@ -16,41 +16,44 @@
  *   You should have received a copy of the GNU General Public License       *
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.   *
  *****************************************************************************/
-/*!
- * \file
- * \ingroup OnePTests
- * \brief The properties and problem setup for rotation symmetry test
- */
+
+// ### Header guard
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_PROBLEM_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_PROBLEM_HH
 
+// This file contains the __problem class__ which defines the initial and boundary
+// conditions for the single-phase flow simulation.
+//
+// ### Include files
+// This header contains the porous medium problem class that this class is derived from:
 #include <dumux/porousmediumflow/problem.hh>
+// This header contains a convience function to calculate L2 errors
 #include <dumux/common/integrate.hh>
-
+// This header contains the class that specifies all spatially variable parameters
+// related to this problem.
 #include "spatialparams.hh"
 
+// ### The problem class
+// We enter the problem class where all necessary boundary conditions and initial conditions are set for our simulation.
+// As this is a porous medium flow problem, we inherit from the base class `PorousMediumFlowProblem`.
 namespace Dumux {
 
-/*!
- * \ingroup OnePTests
- * \brief  Test problem for the incompressible one-phase model
- */
 template<class TypeTag>
 class OnePTestProblem : public PorousMediumFlowProblem<TypeTag>
 {
+    // We use convenient declarations that we derive from the property system.
     using ParentType = PorousMediumFlowProblem<TypeTag>;
     using GridView = GetPropType<TypeTag, Properties::GridView>;
-    using Element = typename GridView::template Codim<0>::Entity;
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
     using PrimaryVariables = GetPropType<TypeTag, Properties::PrimaryVariables>;
     using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
     using BoundaryTypes = GetPropType<TypeTag, Properties::BoundaryTypes>;
     static constexpr int dimWorld = GridView::dimensionworld;
     using GlobalPosition = Dune::FieldVector<Scalar, dimWorld>;
-    using NumEqVector = GetPropType<TypeTag, Properties::NumEqVector>;
     using SolutionVector = GetPropType<TypeTag, Properties::SolutionVector>;
 
 public:
+    // This is the constructor of our problem class:
     OnePTestProblem(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry), q_(0.0), pExact_(gridGeometry->numDofs())
     {
@@ -71,55 +74,41 @@ public:
         }
     }
 
-    /*!
-     * \brief Specifies which kind of boundary condition should be
-     *        used for which equation on a given boundary control volume.
-     *
-     * \param globalPos The position of the center of the finite volume
-     */
+    // First, we define the type of boundary conditions depending on the location. Two types of boundary  conditions
+    // can be specified: Dirichlet or Neumann boundary condition. On a Dirichlet boundary, the values of the
+    // primary variables need to be fixed. On a Neumann boundary condition, values for derivatives need to be fixed.
     BoundaryTypes boundaryTypesAtPos(const GlobalPosition &globalPos) const
     {
         BoundaryTypes values;
+        // We specify Dirichlet boundaries everywhere
         values.setAllDirichlet();
 
         return values;
     }
 
-    /*!
-     * \brief Evaluates the boundary conditions for a Dirichlet control volume.
-     *
-     * \param globalPos The center of the finite volume which ought to be set.
-     *
-     */
+    // Second, we specify the values for the Dirichlet boundaries. We need to fix values of our primary variable
     PrimaryVariables dirichletAtPos(const GlobalPosition &globalPos) const
     {
+        // The exact solution values are set as Dirichlet values
         return exactSolution(globalPos);
     }
 
-    /*!
-     * \brief Returns the temperature \f$\mathrm{[K]}\f$ for an isothermal problem.
-     *
-     * This is not specific to the discretization. By default it just
-     * throws an exception so it must be overloaded by the problem if
-     * no energy equation is used.
-     */
+    // We need to specify a constant temperature for our isothermal problem.
+    // Fluid properties that depend on temperature will be calculated with this value.
     Scalar temperature() const
     {
         return 283.15; // 10°C
     }
 
-    /*!
-     * \brief Adds additional VTK output data to the VTKWriter. Function is called by the output module on every write.
-     */
+    // This method add the exact pressure values to the vtk output
     template<class VTKWriter>
     void addVtkFields(VTKWriter& vtk) const
     {
         vtk.addField(pExact_, "pExact");
     }
 
-    /*!
-     * \brief Writes the L2 error
-     */
+    // The L2 error between the exact and numerical solution is calculated using this function,
+    // using a specific order for the quadrature rule.
     template<class SolutionVector>
     Scalar calculateL2Error(const SolutionVector& curSol, const int order)
     {
@@ -127,11 +116,7 @@ public:
     }
 
 private:
-    /*!
-     * \brief The exact solution
-     * The exact solution is calculated such that the mass flux over the surface of a circular disc with radius rW is q
-     * and the pressure at this surface is given by pW.
-     */
+    // This function defines the exact pressure solution
     PrimaryVariables exactSolution(const GlobalPosition &globalPos) const
     {
         PrimaryVariables priVars(0.0);
@@ -144,8 +129,11 @@ private:
     GlobalPosition pW_;
     static constexpr Scalar eps_ = 1.5e-7;
     SolutionVector pExact_;
+
+    // This is everything the one phase rotation symmetry problem class contains.
 };
 
+// We leave the namespace Dumux.
 } // end namespace Dumux
 
 #endif

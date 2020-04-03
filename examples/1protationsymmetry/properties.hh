@@ -114,16 +114,15 @@ public:
     using type = FluidSystems::OnePLiquid<Scalar, Components::Constant<1, Scalar> >;
 };
 
-// This enables grid-wide caching of the volume variables.
+// This disables grid-wide caching of the volume variables.
 template<class TypeTag>
 struct EnableGridVolumeVariablesCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-//This enables grid wide caching for the flux variables.
+//This disables grid wide caching for the flux variables.
 template<class TypeTag>
 struct EnableGridFluxVariablesCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-// This enables grid-wide caching for the finite volume grid geometry
+// This disables grid-wide caching for the finite volume grid geometry
 template<class TypeTag>
 struct EnableGridGeometryCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-// The caches store values that were already calculated for later usage. This increases the memory demand but makes the simulation faster.
 
 // We leave the namespace Dumux::Properties.
 } // end namespace Dumux::Properties
