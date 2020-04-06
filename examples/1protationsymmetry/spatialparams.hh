@@ -16,11 +16,6 @@
  *   You should have received a copy of the GNU General Public License       *
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.   *
  *****************************************************************************/
-/*!
- * \file
- * \ingroup OnePTests
- * \brief The spatial params the rotation symmetry test
- */
 
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
@@ -30,11 +25,6 @@
 
 namespace Dumux {
 
-/*!
- * \ingroup OnePTests
- * \brief The spatial parameters class for the rotation symmetry test
- *        using the incompressible 1p model
- */
 template<class GridGeometry, class Scalar>
 class OnePTestSpatialParams
 : public FVSpatialParamsOneP<GridGeometry, Scalar,
@@ -58,14 +48,6 @@ public:
         permeability_ = getParam<Scalar>("SpatialParams.Permeability");
     }
 
-    /*!
-     * \brief Function for defining the (intrinsic) permeability \f$[m^2]\f$.
-     *
-     * \param element The element
-     * \param scv The sub-control volume
-     * \param elemSol The element solution vector
-     * \return The intrinsic permeability
-     */
     template<class ElementSolution>
     PermeabilityType permeability(const Element& element,
                                   const SubControlVolume& scv,
@@ -74,10 +56,6 @@ public:
         return permeability_;
     }
 
-    /*! \brief Defines the porosity in [-].
-   *
-   * \param globalPos The global position where we evaluate
-   */
     Scalar porosityAtPos(const GlobalPosition& globalPos) const
     { return 0.4; }
 
