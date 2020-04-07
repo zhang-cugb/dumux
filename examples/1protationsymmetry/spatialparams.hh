@@ -19,6 +19,8 @@
 
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
+
+// ## The spatial parameter class (`spatialparams.hh`)
 // [[content]]
 #include <dumux/material/spatialparams/fv1p.hh>
 

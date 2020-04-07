@@ -25,7 +25,7 @@ __Table of contents__. This description is structured as follows:
 [[_TOC_]]
 
 
-# Problem setup
+## Problem setup
 
 We consider a single-phase problem that leads to a rotation-symmetric pressure distribution.
 The following figure illustrates the setup:
@@ -46,7 +46,7 @@ a one-dimensional problem in the radial coordinate $`r`$. Therefore, in this exa
 solve the problem on a one-dimensional computational domain as illustrated by the orange line in
 the above figure.
 
-# Mathematical model
+## Mathematical model
 
 In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
 the Darcy velocity $`\textbf v`$ to gradients of the pressure $`p`$. For an isotropic medium and
@@ -94,7 +94,7 @@ polar coordinates we can write the mass balance equation as:
    = 0.
 ```
 
-# Discretization
+## Discretization
 
 We employ a finite-volume scheme to spatially discretize the mass balance equation shown above.
 The discrete equation describing mass conservation inside a control volume $`K`$ is obtained
@@ -132,7 +132,10 @@ and the area of a face $`\sigma \in \mathcal{S}_{K_i}`$ is
 
 where $`r_\sigma`$ is the radius at which the face is defined.
 
+# Implementation
 
+
+## The problem class (`problem.hh`)
 This file contains the __problem class__ which defines the initial and boundary
 conditions for the single-phase flow simulation.
 
@@ -233,6 +236,7 @@ private:
 
 
 
+## The spatial parameter class (`spatialparams.hh`)
 
 <details open>
 <summary><b>Click to hide/show the file documentation</b> (or inspect the [source code](spatialparams.hh))</summary>
@@ -274,6 +278,7 @@ private:
 
 
 
+## The properties (`properties.hh`)
 This file defines the `TypeTag` used for the single-phase rotation symmetry simulation, for
 which we then define the necessary properties.
 
@@ -314,9 +319,10 @@ For rotational symmetric problems we use special geometry traits
 ```
 
 </details>
-### Property definitions
 
 ```cpp
+
+
 namespace Dumux::Properties {
 ```
 
@@ -398,7 +404,12 @@ struct FluidSystem<TypeTag, TTag::OnePRotSym>
 
 
 
+## The main program (`main.cc`)
 We look now at the main file for the tracer problem. We set up two problems in this file and solve them sequentially, first the 1p problem and afterwards the tracer problem. The result of the 1p problem is the pressure distribution in the problem domain. We use it to calculate the volume fluxes, which act as an input for the tracer problem. Based on this volume fluxes, we calculate the transport of a tracer in the following tracer problem.
+
+<details open>
+<summary><b>Click to hide/show the file documentation</b> (or inspect the [source code](main.cc))</summary>
+
 ### Includes
 <details><summary> Click to show includes</summary>
 
@@ -586,6 +597,8 @@ catch (const Dune::Exception &e)
     return 3;
 }
 ```
+
+</details>
 
 </details>
 

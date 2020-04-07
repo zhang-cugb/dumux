@@ -23,7 +23,7 @@ __Table of contents__. This description is structured as follows:
 [[_TOC_]]
 
 
-# Problem setup
+## Problem setup
 
 We consider a single-phase problem that leads to a rotation-symmetric pressure distribution.
 The following figure illustrates the setup:
@@ -44,7 +44,7 @@ a one-dimensional problem in the radial coordinate $`r`$. Therefore, in this exa
 solve the problem on a one-dimensional computational domain as illustrated by the orange line in
 the above figure.
 
-# Mathematical model
+## Mathematical model
 
 In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
 the Darcy velocity $`\textbf v`$ to gradients of the pressure $`p`$. In the case of rotational
@@ -64,7 +64,7 @@ polar coordinates:
 
 where $`\phi`$ is the porosity of the porous medium and $`\varrho`$ is the fluid density.
 
-# Discretization
+## Discretization
 
 We employ a finite-volume scheme to spatially discretize the mass balance equation shown above.
 The discrete equation describing mass conservation inside a control volume $`K`$ is obtained

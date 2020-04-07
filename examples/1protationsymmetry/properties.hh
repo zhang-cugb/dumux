@@ -20,6 +20,7 @@
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_PROPERTIES_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_PROPERTIES_HH
 
+// ## The properties (`properties.hh`)
 // This file defines the `TypeTag` used for the single-phase rotation symmetry simulation, for
 // which we then define the necessary properties.
 // [[content]]
@@ -47,7 +48,6 @@
 #include "spatialparams.hh"
 // [[/details]]
 
-// ### Property definitions
 namespace Dumux::Properties {
 
 // A `TypeTag` for our simulation is created which inherits from the one-phase flow model

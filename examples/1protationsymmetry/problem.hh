@@ -20,6 +20,7 @@
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_PROBLEM_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_PROBLEM_HH
 
+// ## The problem class (`problem.hh`)
 // This file contains the __problem class__ which defines the initial and boundary
 // conditions for the single-phase flow simulation.
 // [[content]]
