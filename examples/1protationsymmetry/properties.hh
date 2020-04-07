@@ -17,31 +17,16 @@
  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.   *
  *****************************************************************************/
 
-// ### Header guard
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_PROPERTIES_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_PROPERTIES_HH
 
 // This file defines the `TypeTag` used for the single-phase rotation symmetry simulation, for
 // which we then define the necessary properties.
-//
-// ### Include files
-// The `TypeTag` defined for this simulation will inherit all properties from the
-// `OneP` type tag, a convenience type tag that predefines most of the required
-// properties for single-phase flow simulations in DuMuX. The properties that will be
-// defined in this file are those that depend on user choices and no meaningful
-// default can be set.
-#include <dumux/porousmediumflow/1p/model.hh>
-
-// We want to use `YaspGrid`, an implementation of the dune grid interface for structured grids:
-#include <dune/grid/yaspgrid.hh>
-// In this example, we want to discretize the equations with the cell centered finite volume
-// scheme using two-point-flux approximation or with a vertex-centered scheme, the Box scheme:
-#include <dumux/discretization/cctpfa.hh>
-#include <dumux/discretization/box.hh>
-// The fluid properties are specified in the following headers
-// (we use the constant component for which its properties can be defined in the input file):
-#include <dumux/material/components/constant.hh>
-#include <dumux/material/fluidsystems/1pliquid.hh>
+// [[content]]
+// ### Includes
+// [[details]] includes
+#include <dune/grid/yaspgrid.hh> // for `Dune::YaspGrid`
+#include <dumux/discretization/box.hh> // for `TTag::BoxModel`
 
 // The local residual for incompressible flow is included.
 // The one-phase flow model (included above) uses a default implementation of the
@@ -49,81 +34,72 @@
 // incompressible fluid phase. Therefore, we are including the specialized local
 // residual which contains functionality to analytically compute the entries of
 // the Jacobian matrix. We will use this in the main file.
+#include <dumux/porousmediumflow/1p/model.hh> // for `TTag::OneP`
 #include <dumux/porousmediumflow/1p/incompressiblelocalresidual.hh>
 
-// We include the problem and spatial parameters headers used for this simulation.
-#include "problem.hh"
-#include "spatialparams.hh"
+#include <dumux/material/components/constant.hh>
+#include <dumux/material/fluidsystems/1pliquid.hh>
 
 // For rotational symmetric problems we use special geometry traits
 #include <dumux/discretization/rotationsymmetricgridgeometrytraits.hh>
 
-// ### Basic property definitions for the 1p problem
-// We enter the namespace Dumux::Properties in order to import the entire Dumux namespace for general use:
-namespace Dumux:: Properties {
+#include "problem.hh"
+#include "spatialparams.hh"
+// [[/details]]
+
+// ### Property definitions
+namespace Dumux::Properties {
 
 // A `TypeTag` for our simulation is created which inherits from the one-phase flow model
 // and the cell centered finite volume scheme with two-point-flux discretization scheme:
 namespace TTag {
-struct OnePRotSymBox { using InheritsFrom = std::tuple<OneP, BoxModel>; };
+struct OnePRotSym { using InheritsFrom = std::tuple<OneP, BoxModel>; };
 }
 
 // We use a structured 1D grid with an offset:
 template<class TypeTag>
-struct Grid<TypeTag, TTag::OnePRotSymBox> { using type =  Dune::YaspGrid<1, Dune::EquidistantOffsetCoordinates<GetPropType<TypeTag, Properties::Scalar>, 1> >; };
+struct Grid<TypeTag, TTag::OnePRotSym>
+{ using type =  Dune::YaspGrid<1, Dune::EquidistantOffsetCoordinates<double, 1>>; };
 
 // Special grid geometry traits are needed
 template<class TypeTag>
-struct GridGeometry<TypeTag, TTag::OnePRotSymBox>
+struct GridGeometry<TypeTag, TTag::OnePRotSym>
 {
-private:
     static constexpr bool enableCache = getPropValue<TypeTag, Properties::EnableGridGeometryCache>();
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    using GridView = GetPropType<TypeTag, Properties::GridView>;
+    using GridView = typename GetPropType<TypeTag, Properties::Grid>::LeafGridView;
     using GGTraits = RotationSymmetricGridGeometryTraits<BoxDefaultGridGeometryTraits<GridView>, RotationPolicy::disc>;
-public:
+
     using type = BoxFVGridGeometry<Scalar, GridView, enableCache, GGTraits>;
-};
-
-// The problem class specifies initial and boundary conditions:
-template<class TypeTag>
-struct Problem<TypeTag, TTag::OnePRotSymBox> { using type = OnePTestProblem<TypeTag>; };
-
-// We define the spatial parameters for our simulation:
-template<class TypeTag>
-struct SpatialParams<TypeTag, TTag::OnePRotSymBox>
-{
-private:
-    using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-public:
-    using type = OnePTestSpatialParams<GridGeometry, Scalar>;
 };
 
 // We use the local residual that contains analytic derivative methods for incompressible flow:
 template<class TypeTag>
-struct LocalResidual<TypeTag, TTag::OnePRotSymBox> { using type = OnePIncompressibleLocalResidual<TypeTag>; };
+struct LocalResidual<TypeTag, TTag::OnePRotSym>
+{ using type = OnePIncompressibleLocalResidual<TypeTag>; };
+
+// The problem class specifies initial and boundary conditions:
+template<class TypeTag>
+struct Problem<TypeTag, TTag::OnePRotSym>
+{ using type = RotSymExampleProblem<TypeTag>; };
+
+// We define the spatial parameters for our simulation:
+template<class TypeTag>
+struct SpatialParams<TypeTag, TTag::OnePRotSym>
+{
+    using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+    using type = RotSymExampleSpatialParams<GridGeometry, Scalar>;
+};
 
 // In the following we define the fluid system to be used:
 template<class TypeTag>
-struct FluidSystem<TypeTag, TTag::OnePRotSymBox>
+struct FluidSystem<TypeTag, TTag::OnePRotSym>
 {
-private:
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-public:
     using type = FluidSystems::OnePLiquid<Scalar, Components::Constant<1, Scalar> >;
 };
 
-// This disables grid-wide caching of the volume variables.
-template<class TypeTag>
-struct EnableGridVolumeVariablesCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-//This disables grid wide caching for the flux variables.
-template<class TypeTag>
-struct EnableGridFluxVariablesCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-// This disables grid-wide caching for the finite volume grid geometry
-template<class TypeTag>
-struct EnableGridGeometryCache<TypeTag, TTag::OnePRotSymBox> { static constexpr bool value = false; };
-
-// We leave the namespace Dumux::Properties.
 } // end namespace Dumux::Properties
+// [[/content]]
 #endif

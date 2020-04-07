@@ -3,6 +3,7 @@
         "doc/intro.md",
         "problem.hh",
         "spatialparams.hh",
+        "properties.hh",
         "main.cc",
         "doc/paraview.md"
     ]

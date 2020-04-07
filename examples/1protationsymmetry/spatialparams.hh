@@ -19,50 +19,34 @@
 
 #ifndef DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
 #define DUMUX_ONEP_ROTATION_SYMMETRY_SPATIAL_PARAMS_HH
-
-#include <dumux/porousmediumflow/properties.hh>
+// [[content]]
 #include <dumux/material/spatialparams/fv1p.hh>
 
 namespace Dumux {
 
 template<class GridGeometry, class Scalar>
-class OnePTestSpatialParams
-: public FVSpatialParamsOneP<GridGeometry, Scalar,
-                             OnePTestSpatialParams<GridGeometry, Scalar>>
+class RotSymExampleSpatialParams
+: public FVSpatialParamsOneP<GridGeometry, Scalar, RotSymExampleSpatialParams<GridGeometry, Scalar>>
 {
-    using GridView = typename GridGeometry::GridView;
-    using Element = typename GridView::template Codim<0>::Entity;
-    using FVElementGeometry = typename GridGeometry::LocalView;
-    using SubControlVolume = typename FVElementGeometry::SubControlVolume;
-    using ParentType = FVSpatialParamsOneP<GridGeometry, Scalar,
-                                           OnePTestSpatialParams<GridGeometry, Scalar>>;
-
-    static constexpr int dimWorld = GridView::dimensionworld;
+    using ThisType = RotSymExampleSpatialParams<GridGeometry, Scalar>;
+    using ParentType = FVSpatialParamsOneP<GridGeometry, Scalar, ThisType>;
+    using Element = typename GridGeometry::GridView::template Codim<0>::Entity;
     using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
-
 public:
     using PermeabilityType = Scalar;
-    OnePTestSpatialParams(std::shared_ptr<const GridGeometry> gridGeometry)
+    RotSymExampleSpatialParams(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry)
-    {
-        permeability_ = getParam<Scalar>("SpatialParams.Permeability");
-    }
+    { permeability_ = getParam<Scalar>("SpatialParams.Permeability"); }
 
-    template<class ElementSolution>
-    PermeabilityType permeability(const Element& element,
-                                  const SubControlVolume& scv,
-                                  const ElementSolution& elemSol) const
-    {
-        return permeability_;
-    }
+    PermeabilityType permeabilityAtPos(const GlobalPosition& globalPos) const
+    { return permeability_; }
 
     Scalar porosityAtPos(const GlobalPosition& globalPos) const
-    { return 0.4; }
-
+    { return 1.0; }
 private:
     Scalar permeability_;
 };
 
 } // end namespace Dumux
-
+// [[/content]]
 #endif
