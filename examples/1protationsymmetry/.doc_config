@@ -1,0 +1,9 @@
+{
+    "README.md" : [
+        "doc/intro.md",
+        "problem.hh",
+        "spatialparams.hh",
+        "main.cc",
+        "doc/paraview.md"
+    ]
+}
