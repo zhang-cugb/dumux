@@ -4,7 +4,7 @@ __In this example, you will learn how to__
 
 * solve a rotation-symmetric problem one-dimensionally
 * perform a convergence test against an analytical solution
-* apply the `RotationalExtrusion` filters in [ParaView](https://www.paraview.org/) for a two-dimensional visualization of the one-dimensional results
+* apply the `Rotational Extrusion` filters in [ParaView](https://www.paraview.org/) for a two-dimensional visualization of the one-dimensional results
 
 
 __Result__. With the `Rotational Extrusion` and the `Warp By Scalar` filters in [ParaView](https://www.paraview.org/),

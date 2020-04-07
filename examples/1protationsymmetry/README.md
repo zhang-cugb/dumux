@@ -6,10 +6,10 @@ __In this example, you will learn how to__
 
 * solve a rotation-symmetric problem one-dimensionally
 * perform a convergence test against an analytical solution
-* apply the `RotationalExtrusion` filters in [ParaView](https://www.paraview.org/) for a two-dimensional visualization of the one-dimensional results
+* apply the `Rotational Extrusion` filters in [ParaView](https://www.paraview.org/) for a two-dimensional visualization of the one-dimensional results
 
 
-__Result__. With the `RotationalExtrusion` and the `WarpByScalar` filter in [ParaView](https://www.paraview.org/),
+__Result__. With the `Rotational Extrusion` and the `Warp By Scalar` filter in [ParaView](https://www.paraview.org/),
 the pressure distribution of this example looks as shown in the following picture:
 
 <figure>
@@ -602,4 +602,9 @@ catch (const Dune::Exception &e)
 
 </details>
 
-# TODO: Paraview stuff
+# Post-processing with ParaView
+
+The result file `example_rotationsymmetry.pvd` can be opened with the software [ParaView](https://www.paraview.org/).
+To obtain a visualisation as shown in the introduction of this documented example, after loading
+the result file, choose `Filters`>`Alphabetical`>`Rotational Extrusion`.
+You might have to reset your view and switch to `3D`. Then apply `Filters`>`Alphabetical`>`Warp By Scalar`.
