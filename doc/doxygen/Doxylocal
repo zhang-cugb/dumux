@@ -11,15 +11,7 @@ PREDEFINED            += "NEW_PROP_TAG(name)=Property tag name" \
                          HAVE_VALGRIND:=1
 
 INPUT                 += @srcdir@/mainpage.txt \
-                         @srcdir@/modules.txt \
-                         @top_srcdir@/dumux \
-                         @top_srcdir@/test \
-                         # @srcdir@/extradoc/parameterlist.txt \ # we currently do not have a parameter list. Should be back for 3.1
-                         # @srcdir@/extradoc/featurelist.txt # we currently do not have a feature list. Should be back for 3.1
-
-EXAMPLE_PATH          += @srcdir@/extradoc
-
-IMAGE_PATH             = @srcdir@/images
+                         @srcdir@/bla.cpp
 
 EXTRA_PACKAGES        += amsmath,amssymb,units
 

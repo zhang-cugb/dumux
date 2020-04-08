@@ -4,25 +4,7 @@
  * \brief documentation for the doxygen main page
  */
 
-/** \mainpage DuMu<sup>X</sup> Documentation
-
-\section intro Introduction
-
-Welcome to the DuMu<sup>X</sup> documentation pages. This documentation has been
-generated using <a href="http://www.doxygen.org/index.html">Doxygen</a>, a free source code documentation system for
-documenting C/C++ code.
-
-\section mods Modules
-
-The best way to start is from the <a href="modules.html">Modules</a> page which gives
-you access to the documentation by category.
-
-\section params Parameters
-
-An overview of all availabe parameters is given in \ref parameterlist.txt.
-
-\section features Features
-
-An overview of special features implemented in the DuMu<sup>X</sup>-test-problems will be available soon.
-
-*/
+/*!  * \defgroup OnePModel 1p
+     * \brief Single-phase (immiscible) Darcy flow
+     * \copydetails bla.cpp
+     */

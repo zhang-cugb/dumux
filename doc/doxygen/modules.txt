@@ -14,7 +14,7 @@
      * \ingroup PorousmediumflowModels
      * \defgroup OnePModel 1p
      * \brief Single-phase (immiscible) Darcy flow
-     * \copydetails ./porousmediumflow/1p/model.hh
+     * \copydetails bla.cpp
      */
         /*!
          * \ingroup OnePModel
@@ -31,7 +31,7 @@
      * \ingroup PorousmediumflowModels
      * \defgroup OnePNCModel 1pnc
      * \brief Single-phase, multi-component Darcy flow
-     * \copydetails ./porousmediumflow/1pnc/model.hh
+     * \copydetails './porousmediumflow/1pnc/model.hh'
      */
     /*!
      * \ingroup PorousmediumflowModels
