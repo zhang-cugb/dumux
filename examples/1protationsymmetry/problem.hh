@@ -47,7 +47,8 @@ class RotSymExampleProblem : public PorousMediumFlowProblem<TypeTag>
     using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
 
 public:
-    // This is the constructor of our problem class:
+    // In the constructor, we obtain a number of parameters from the input file.
+    // [[codeblock]]
     RotSymExampleProblem(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry)
     {
@@ -55,30 +56,44 @@ public:
         nu_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
         q_ = getParam<Scalar>("Problem.Source");
         pW_ = getParam<Scalar>("Problem.WellPressure");
+
+        // The well radius
         rW_ = gridGeometry->bBoxMin()[0];
     }
-
-    // First, we define the type of boundary conditions depending on the location. Two types of boundary  conditions
-    // can be specified: Dirichlet or Neumann boundary condition. On a Dirichlet boundary, the values of the
-    // primary variables need to be fixed. On a Neumann boundary condition, values for derivatives need to be fixed.
-    BoundaryTypes boundaryTypesAtPos(const GlobalPosition &globalPos) const
-    {
-        BoundaryTypes values;
-        values.setAllDirichlet();
-        return values;
-    }
-
-    // Second, we specify the values for the Dirichlet boundaries. We need to fix values of our primary variable
-    PrimaryVariables dirichletAtPos(const GlobalPosition &globalPos) const
-    { return exactSolution(globalPos); }
+    // [[/codeblock]]
 
     // We need to specify a constant temperature for our isothermal problem.
     // Fluid properties that depend on temperature will be calculated with this value.
     Scalar temperature() const
     { return 283.15; }
 
-    // This function defines the exact pressure solution
-    PrimaryVariables exactSolution(const GlobalPosition &globalPos) const
+    // #### Specify the types of boundary conditions
+    // This function is used to define the type of boundary conditions used depending on the location.
+    // Two types of boundary  conditions can be specified: Dirichlet or Neumann boundary condition.
+    // On a Dirichlet boundary, the values of the primary variables need to be fixed. On a Neumann
+    // boundary condition, values for derivatives need to be fixed. Here, we use Dirichlet boundary
+    // conditions on all boundaries.
+    BoundaryTypes boundaryTypesAtPos(const GlobalPosition& globalPos) const
+    {
+        BoundaryTypes values;
+        values.setAllDirichlet();
+        return values;
+    }
+
+    // #### Specify Dirichlet boundary condition values
+    // This function is used to specify the values of the primary variables at Dirichlet boundaries.
+    // Here, we evaluate the analytical solution to define the pressures at the boundaries.
+    PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
+    { return exactSolution(globalPos); }
+
+    // #### Analytical solution
+    // There exists an analytical solution to the problem that is solved in this example.
+    // The following function evaluates this solution depending on the position in the
+    // domain. We use this function here both to specify Dirichlet boundaries and to
+    // evaluate the error of the numerical solutions obtained for different levels of
+    // grid refinement.
+    // [[codeblock]]
+    PrimaryVariables exactSolution(const GlobalPosition& globalPos) const
     {
         const auto r = globalPos[0];
         const auto p = pW_ - 1.0/(2*M_PI)*nu_/k_*q_*std::log(r/rW_);
@@ -86,9 +101,11 @@ public:
     }
 
 private:
+    // private data members required for the analytical solution
     Scalar q_, k_, nu_, rW_, pW_;
 };
 
 } // end namespace Dumux
+// [[/codeblock]]
 // [[/content]]
 #endif
