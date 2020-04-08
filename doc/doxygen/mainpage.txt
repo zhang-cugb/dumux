@@ -6,5 +6,5 @@
 
 /*!  * \defgroup OnePModel 1p
      * \brief Single-phase (immiscible) Darcy flow
-     * \copydetails bla.cpp
+     * \copydetails dumux/porousmediumflow/1p/model.hh
      */
