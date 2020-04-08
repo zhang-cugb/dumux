@@ -11,9 +11,9 @@ The code documentation is structured as follows:
 [[_TOC_]]
 
 
-## The properties (`properties.hh`)
-This file defines the `TypeTag` used for the single-phase rotation symmetry simulation, for
-which we then define the necessary properties.
+## Compile-time settings (`properties.hh`)
+This file defines the `TypeTag` used for the simulation in this example, for
+which we specialize a number of compile-time `properties`.
 
 <details open>
 <summary><b>Click to hide/show the file documentation</b> (or inspect the [source code](../properties.hh))</summary>
@@ -35,99 +35,131 @@ residual which contains functionality to analytically compute the entries of
 the Jacobian matrix. We will use this in the main file.
 
 ```cpp
-#include <dumux/porousmediumflow/1p/model.hh> // for `TTag::OneP`
 #include <dumux/porousmediumflow/1p/incompressiblelocalresidual.hh>
+```
 
+The `OneP` type tag specializes most of the `properties` required for single-
+phase flow simulations in DuMuX. We will use this in the following to inherit the
+respective properties, and subsequently specialize those properties for our
+type tag, which we want to modify or for which no meaningful default can be set.
+
+```cpp
+#include <dumux/porousmediumflow/1p/model.hh> // for `TTag::OneP`
+```
+
+We will use a single liquid phase consisting of a component with constant fluid properties.
+
+```cpp
 #include <dumux/material/components/constant.hh>
 #include <dumux/material/fluidsystems/1pliquid.hh>
 ```
 
-For rotational symmetric problems we use special geometry traits
+As mentioned at the beginning of the documentation of this example, DuMuX
+provides specialized implementations of control volumes and faces for
+rotation-symmetric problems. These take care of adjusting volume and area
+computations to account for the extrusion about the symmetry axes.
+These implementations are exported by the `RotationSymmetricGridGeometryTraits`.
 
 ```cpp
 #include <dumux/discretization/rotationsymmetricgridgeometrytraits.hh>
+```
 
+The classes that define the problem and parameters used in this simulation
+
+```cpp
 #include "problem.hh"
 #include "spatialparams.hh"
 ```
 
 </details>
 
+### `TypeTag` definition
+A `TypeTag` for our simulation is defined, which inherits properties from the
+single-phase flow model and the box scheme.
+
 ```cpp
-
-
 namespace Dumux::Properties {
-```
-
-A `TypeTag` for our simulation is created which inherits from the one-phase flow model
-and the cell centered finite volume scheme with two-point-flux discretization scheme:
-
-```cpp
 namespace TTag {
 struct OnePRotSym { using InheritsFrom = std::tuple<OneP, BoxModel>; };
 }
 ```
 
-We use a structured 1D grid with an offset:
+### Property specializations
+
+In the following piece of code, mandatory `properties` for which no meaningful
+default can be set, are specialized for our type tag `OnePRotSym`.
 
 ```cpp
+// We use a structured 1D grid with an offset. This allows us to define the
+// computational domain to be between the radii $`r_1`$ and $`r_2`$ as illustrated
+// in the beginning of the documentation of this example
 template<class TypeTag>
 struct Grid<TypeTag, TTag::OnePRotSym>
 { using type =  Dune::YaspGrid<1, Dune::EquidistantOffsetCoordinates<double, 1>>; };
+
+// The problem class specifying initial and boundary conditions:
+template<class TypeTag>
+struct Problem<TypeTag, TTag::OnePRotSym>
+{ using type = RotSymExampleProblem<TypeTag>; };
+
+// Our spatial parameters class defining the permeability and porosity of the porous medium:
+template<class TypeTag>
+struct SpatialParams<TypeTag, TTag::OnePRotSym>
+{
+private:
+    using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+public:
+    using type = RotSymExampleSpatialParams<GridGeometry, Scalar>;
+};
+
+// We use a single liquid phase consisting of a component with constant fluid properties.
+template<class TypeTag>
+struct FluidSystem<TypeTag, TTag::OnePRotSym>
+{
+private:
+    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+public:
+    using type = FluidSystems::OnePLiquid<Scalar, Components::Constant<1, Scalar> >;
+};
 ```
 
-Special grid geometry traits are needed
+As mentioned before, DuMuX provides specialized implementations of sub-control
+volumes and faces for rotation-symmetric problems, which are exported by the
+`RotationSymmetricGridGeometryTraits`.
+Here, we pass these traits to the grid geometry of the box scheme (the scheme
+that we use here) and specialize the `GridGeometry` property accordingly.
 
 ```cpp
 template<class TypeTag>
 struct GridGeometry<TypeTag, TTag::OnePRotSym>
 {
+private:
     static constexpr bool enableCache = getPropValue<TypeTag, Properties::EnableGridGeometryCache>();
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
     using GridView = typename GetPropType<TypeTag, Properties::Grid>::LeafGridView;
-    using GGTraits = RotationSymmetricGridGeometryTraits<BoxDefaultGridGeometryTraits<GridView>, RotationPolicy::disc>;
 
+    // The default traits for box grid geometries
+    using DefaultTraits = BoxDefaultGridGeometryTraits<GridView>;
+
+    // On the basis of the default traits, define the traits for rotational symmetry.
+    // These will export the corresponding rotation-symmetric sub-control volumes and faces.
+    using GGTraits = RotationSymmetricGridGeometryTraits<DefaultTraits, RotationPolicy::disc>;
+
+public:
+    // Pass the above traits to the box grid geometry such that it uses the
+    // rotation-symmetric sub-control volumes and faces.
     using type = BoxFVGridGeometry<Scalar, GridView, enableCache, GGTraits>;
 };
 ```
 
-We use the local residual that contains analytic derivative methods for incompressible flow:
+Moreover, here we use a local residual specialized for incompressible flow
+that contains functionality related to analytic differentiation.
 
 ```cpp
 template<class TypeTag>
 struct LocalResidual<TypeTag, TTag::OnePRotSym>
 { using type = OnePIncompressibleLocalResidual<TypeTag>; };
-```
-
-The problem class specifies initial and boundary conditions:
-
-```cpp
-template<class TypeTag>
-struct Problem<TypeTag, TTag::OnePRotSym>
-{ using type = RotSymExampleProblem<TypeTag>; };
-```
-
-We define the spatial parameters for our simulation:
-
-```cpp
-template<class TypeTag>
-struct SpatialParams<TypeTag, TTag::OnePRotSym>
-{
-    using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    using type = RotSymExampleSpatialParams<GridGeometry, Scalar>;
-};
-```
-
-In the following we define the fluid system to be used:
-
-```cpp
-template<class TypeTag>
-struct FluidSystem<TypeTag, TTag::OnePRotSym>
-{
-    using Scalar = GetPropType<TypeTag, Properties::Scalar>;
-    using type = FluidSystems::OnePLiquid<Scalar, Components::Constant<1, Scalar> >;
-};
 
 } // end namespace Dumux::Properties
 ```
@@ -174,38 +206,25 @@ class RotSymExampleProblem : public PorousMediumFlowProblem<TypeTag>
 public:
 ```
 
-This is the constructor of our problem class:
+In the constructor, we obtain a number of parameters, related to fluid
+properties and boundary conditions, from the input file.
 
 ```cpp
     RotSymExampleProblem(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry)
     {
+        // fluid properties
         k_ = getParam<Scalar>("SpatialParams.Permeability");
         nu_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
-        q_ = getParam<Scalar>("Problem.Source");
-        pW_ = getParam<Scalar>("Problem.WellPressure");
-        rW_ = gridGeometry->bBoxMin()[0];
+
+        // The inner radius p1 can be determined from the grid
+        r1_ = gridGeometry->bBoxMin()[0];
+
+        // boundary conditions
+        q1_ = getParam<Scalar>("Problem.Q1"); // mass flux into the domain at r1 in kg/s/m
+        p1_ = getParam<Scalar>("Problem.P1"); // pressure at the inner boundary at r1
+
     }
-```
-
-First, we define the type of boundary conditions depending on the location. Two types of boundary  conditions
-can be specified: Dirichlet or Neumann boundary condition. On a Dirichlet boundary, the values of the
-primary variables need to be fixed. On a Neumann boundary condition, values for derivatives need to be fixed.
-
-```cpp
-    BoundaryTypes boundaryTypesAtPos(const GlobalPosition &globalPos) const
-    {
-        BoundaryTypes values;
-        values.setAllDirichlet();
-        return values;
-    }
-```
-
-Second, we specify the values for the Dirichlet boundaries. We need to fix values of our primary variable
-
-```cpp
-    PrimaryVariables dirichletAtPos(const GlobalPosition &globalPos) const
-    { return exactSolution(globalPos); }
 ```
 
 We need to specify a constant temperature for our isothermal problem.
@@ -216,18 +235,56 @@ Fluid properties that depend on temperature will be calculated with this value.
     { return 283.15; }
 ```
 
-This function defines the exact pressure solution
+#### Specify the types of boundary conditions
+This function is used to define the type of boundary conditions used depending on the location.
+Two types of boundary  conditions can be specified: Dirichlet or Neumann boundary condition.
+On a Dirichlet boundary, the values of the primary variables need to be fixed. On a Neumann
+boundary condition, values for derivatives need to be fixed. Here, we use Dirichlet boundary
+conditions on all boundaries.
 
 ```cpp
-    PrimaryVariables exactSolution(const GlobalPosition &globalPos) const
+    BoundaryTypes boundaryTypesAtPos(const GlobalPosition& globalPos) const
+    {
+        BoundaryTypes values;
+        values.setAllDirichlet();
+        return values;
+    }
+```
+
+#### Specify Dirichlet boundary condition values
+This function is used to specify the values of the primary variables at Dirichlet boundaries.
+Here, we evaluate the analytical solution (see below) to define the pressures at the boundaries.
+
+```cpp
+    PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
+    { return exactSolution(globalPos); }
+```
+
+#### Analytical solution
+The analytical solution to the problem of this example reads:
+
+```math
+p = p (r) = p_1 - \frac{q_1 \nu}{2 \pi k} \text{ln} (\frac{r}{r_1}),
+```
+
+where $`q_1`$ is the mass flux into the domain at the inner radius $`r_1`$
+(in kg/s/m) and $`\nu = \mu/\varrho`$ is the kinematic viscosity.
+The following function evaluates this solution depending on the
+position in the domain. We use this function here both to specify Dirichlet
+boundaries and to evaluate the error of the numerical solutions obtained for
+different levels of grid refinement.
+
+```cpp
+    PrimaryVariables exactSolution(const GlobalPosition& globalPos) const
     {
         const auto r = globalPos[0];
-        const auto p = pW_ - 1.0/(2*M_PI)*nu_/k_*q_*std::log(r/rW_);
+        const auto p = p1_ - 1.0/(2*M_PI)*nu_/k_*q1_*std::log(r/r1_);
         return p;
     }
 
 private:
-    Scalar q_, k_, nu_, rW_, pW_;
+    // private data members required for the analytical solution
+    Scalar q1_, k_, nu_, r1_, p1_;
 };
 
 } // end namespace Dumux
@@ -238,15 +295,32 @@ private:
 
 
 
-## The spatial parameter class (`spatialparams.hh`)
+## Parameter distributions (`spatialparams.hh`)
+
+This file contains the __spatial parameters class__ which defines the
+distributions for the porous medium parameters permeability and porosity
+over the computational grid.
 
 <details open>
 <summary><b>Click to hide/show the file documentation</b> (or inspect the [source code](../spatialparams.hh))</summary>
 
+We include the spatial parameters class for single-phase models discretized
+by finite volume schemes, from which the spatial parameters defined for this
+example inherit.
 
 ```cpp
 #include <dumux/material/spatialparams/fv1p.hh>
+```
 
+### The spatial parameters class
+
+In the `RotSymExampleSpatialParams` class, we define the functions needed to describe
+the porous medium, that is, porosity and permeability.
+We inherit from the `FVSpatialParamsOneP` class here, which is the base class
+for spatial parameters in the context of single-phase porous medium flow
+applications using finite volume discretization schemes.
+
+```cpp
 namespace Dumux {
 
 template<class GridGeometry, class Scalar>
@@ -258,16 +332,34 @@ class RotSymExampleSpatialParams
     using Element = typename GridGeometry::GridView::template Codim<0>::Entity;
     using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
 public:
+    // Spatial parameter classes for porous medium flow applications need to
+    // export the type used for intrinsic permeabilities.
     using PermeabilityType = Scalar;
+
+    // In the constructor we obtain the permeability value from the input file.
     RotSymExampleSpatialParams(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry)
     { permeability_ = getParam<Scalar>("SpatialParams.Permeability"); }
+```
 
+#### Porosity distribution
+This function is used to define the porosity distribution in the
+computational domain. Here, we use a constant porosity of 1.0.
+
+```cpp
+    Scalar porosityAtPos(const GlobalPosition& globalPos) const
+    { return 1.0; }
+```
+
+#### Permeability distribution
+This function is used to define the permeability distribution in the
+computational domain. Here, we use a constant permeability that is
+defined in the input file.
+
+```cpp
     PermeabilityType permeabilityAtPos(const GlobalPosition& globalPos) const
     { return permeability_; }
 
-    Scalar porosityAtPos(const GlobalPosition& globalPos) const
-    { return 1.0; }
 private:
     Scalar permeability_;
 };

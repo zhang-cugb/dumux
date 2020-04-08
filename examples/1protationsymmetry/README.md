@@ -9,13 +9,13 @@ __In this example, you will learn how to__
 * apply the `Rotational Extrusion` filters in [ParaView](https://www.paraview.org/) for a two-dimensional visualization of the one-dimensional results
 
 
-__Result__. With the `Rotational Extrusion` and the `Warp By Scalar` filter in [ParaView](https://www.paraview.org/),
+__Result__. With the `Rotational Extrusion` and the `Warp By Scalar` filters in [ParaView](https://www.paraview.org/),
 the pressure distribution of this example looks as shown in the following picture:
 
 <figure>
     <center>
         <img src="img/result.png" alt="Rotation-symmetric pressure distribution" width="60%"/>
-        <figcaption> <b> Fig.1 </b> - Result TODO.</figcaption>
+        <figcaption> <b> Fig.1 </b> - Rotation-symmetric pressure distribution on a disc (warped to 3D). </figcaption>
     </center>
 </figure>
 
@@ -49,50 +49,22 @@ the above figure.
 ## Mathematical model
 
 In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
-the Darcy velocity $`\textbf v`$ to gradients of the pressure $`p`$. For an isotropic medium and
-neglecting gravitational forces, this can be written as:
+the Darcy velocity $`\textbf u`$ to gradients of the pressure $`p`$. In the case of rotational
+symmetry, this can be written as:
 
 ```math
-\textbf v = - \frac{k}{\mu} \text{grad} p.
+u = - \frac{k}{\mu} \frac{\partial p}{\partial r}.
 ```
 
-Here, $`k`$ is the permeability of the porous medium and $`\varrho`$ and $`\mu`$ are the density
-and the dynamic viscosity of the fluid. In the model, the mass balance equation for the fluid
-phase is solved:
+Here, $`k`$ is the permeability of the porous medium and $`\mu`$ is the dynamic viscosity of the
+fluid. In the model, the mass balance equation for the fluid phase is solved, which reads in
+polar coordinates:
 
 ```math
-\phi \frac{\partial \varrho}{\partial t} + \text{div} \left( \varrho \textbf v \right) = 0,
+\frac{1}{r} \frac{\partial \left( r \varrho u \right)}{\partial r} = 0,
 ```
 
-where $`\phi`$ is the porosity of the porous medium. Let us now introduce the transformation
-$`(x, y)^T = \Phi ( r, \varphi )`$ from polar into cartesian coordinates (see e.g.
-[wikipedia.org](https://en.wikipedia.org/wiki/Polar_coordinate_system#Converting_between_polar_and_Cartesian_coordinates)),
-and denote with
-
-```math
-\tilde{p} \left( r, \varphi \right)
-    = \tilde{p} \left( r \right)
-    = p \left( \Phi^{-1}(x, y) \right)
-```
-
-and
-
-```math
-\tilde{\mathbf{v}} \left( r, \varphi \right)
-    = \tilde{v}_r \left( r \right)
-    = \mathbf{v} \left( \Phi^{-1}(x, y) \right)
-```
-
-the pressure and velocity distributions expressed in polar coordinates. The first identity
-in the two above equations originates from the rotational symmetry of the problem and the
-resulting independence of pressure and velocity on $`\varphi`$ in polar coordinates. Thus, in
-polar coordinates we can write the mass balance equation as:
-
-```math
-\phi \frac{\partial \varrho}{\partial t}
-   - \frac{\partial}{\partial r} \left( \frac{k}{\mu} \frac{\partial \tilde{p}}{\partial r} \right)
-   = 0.
-```
+where $`\phi`$ is the porosity of the porous medium and $`\varrho`$ is the fluid density.
 
 ## Discretization
 
@@ -101,36 +73,20 @@ The discrete equation describing mass conservation inside a control volume $`K`$
 by integration and reads:
 
 ```math
-    | K | \left( \phi \, \partial \varrho / \partial t \right)_K
-    + \sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho v_r \right)_\sigma
+    \sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho u \right)_\sigma
     = 0,
 ```
 
 where $`\sigma`$ are the faces of the control volume such that
-$`\bigcup_{\sigma \in \mathcal{S}_K} \sigma \equiv \partial K`$ and where the notation $`( \cdot )_K`$
-and $`( \cdot )_\sigma`$ was used to denote quantities evaluated for the control volume $`K`$ or a
-face $`\sigma`$, respectively. The volume of the control volume is denoted with $`| K |`$ and
-$`| \sigma |`$ is the area of a face.
+$`\bigcup_{\sigma \in \mathcal{S}_K} \sigma \equiv \partial K`$ and where the notation
+$`( \cdot )_\sigma`$ was used to denote quantities evaluated for a
+face $`\sigma`$. The area of a face is denoted with $`| \sigma |`$.
 
-Integration over polar coordinates requires taking into account the Jacobian determinant of the
-coordinate transformation from polar to cartesian coordinates (see e.g.
-[wikipedia.org](https://en.wikipedia.org/wiki/Polar_coordinate_system#Generalization)).
-Let us discretize the domain by the intervals
-$`K_i = (i\Delta r, (i+1)\Delta r) \times (0, 2 \Pi)`$,
-$`i \in \{1, \dots, N \}`$, as control volumes.
-As a result, their volumes are
-
-```math
-| K_i | = \Pi \left( ((i+1)*\Delta r)^2 - (i*\Delta r)^2 \right)
-```
-
-and the area of a face $`\sigma \in \mathcal{S}_{K_i}`$ is
-
-```math
-| \sigma | = 2 \Pi r_\sigma,
-```
-
-where $`r_\sigma`$ is the radius at which the face is defined.
+DuMuX provides the classes `RotationSymmetricSubControlVolume` and
+`RotationSymmetricSubControlVolumeFace`, which implement one-dimensional control
+volumes and faces, that, in the computations of volumes and areas, take into account
+the extrusion about the rotation axes of symmetry. This will be discussed in part 1
+of the documentation.
 
 # Implementation & Post processing
 
