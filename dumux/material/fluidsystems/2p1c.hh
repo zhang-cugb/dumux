@@ -293,7 +293,6 @@ public:
             DUNE_THROW(Dune::InvalidStateException, "Invalid phase index.");
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -303,6 +302,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\alpha} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx)
     {

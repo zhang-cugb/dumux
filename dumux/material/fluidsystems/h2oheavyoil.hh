@@ -273,7 +273,6 @@ public:
                + HeavyOil::gasDensity(fluidState.temperature(phaseIdx), pNAPL);
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -283,6 +282,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{\overline M_\alpha} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx)
     {
@@ -345,7 +345,6 @@ public:
                + mu[NAPLIdx]*fluidState.moleFraction(gPhaseIdx, NAPLIdx);
     }
 
-    using Base::binaryDiffusionCoefficient;
     /*!
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
@@ -360,6 +359,7 @@ public:
      * \param compIIdx Index of the component i
      * \param compJIdx Index of the component j
      */
+    using Base::binaryDiffusionCoefficient;
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
                                              int phaseIdx,
@@ -384,7 +384,6 @@ public:
 
     }
 
-    using Base::diffusionCoefficient;
     /*!
      * \brief Calculate the binary molecular diffusion coefficient for
      *        a component in a fluid phase \f$\mathrm{[mol^2 * s / (kg*m^3)]}\f$
@@ -405,6 +404,7 @@ public:
      * where \f$\mathrm{p_\alpha}\f$ and \f$\mathrm{T_\alpha}\f$ are the fluid phase'
      * pressure and temperature.
      */
+    using Base::diffusionCoefficient;
     template <class FluidState>
     static Scalar diffusionCoefficient(const FluidState &fluidState, int phaseIdx)
     {

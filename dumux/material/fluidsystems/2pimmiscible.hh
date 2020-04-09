@@ -316,11 +316,11 @@ public:
             Fluid1::Component::init(tempMin, tempMax, nTemp, pressMin, pressMax, nPress);
     }
 
-    using Base::density;
     /*!
      * \brief Calculate the density \f$\mathrm{[kg/m^3]}\f$ of a fluid phase
      *
      */
+    using Base::density;
     template <class FluidState>
     static Scalar density(const FluidState &fluidState,
                           int phaseIdx)
@@ -334,7 +334,6 @@ public:
         return Fluid1::density(temperature, pressure);
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -344,6 +343,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\alpha} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx)
     {
@@ -354,12 +354,12 @@ public:
        return Fluid1::molarDensity(temperature, pressure);
     }
 
-    using Base::viscosity;
     /*!
      * \brief Return the viscosity of a phase \f$\mathrm{[Pa*s]}\f$.
      * \param fluidState The fluid state of the two-phase model
      * \param phaseIdx Index of the fluid phase
      */
+    using Base::viscosity;
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
                             int phaseIdx)
@@ -373,7 +373,6 @@ public:
         return Fluid1::viscosity(temperature, pressure);
     }
 
-    using Base::fugacityCoefficient;
     /*!
      * \brief Calculate the fugacity coefficient \f$\mathrm{[-]}\f$ of an individual
      *        component in a fluid phase
@@ -390,6 +389,7 @@ public:
      * \param phaseIdx Index of the fluid phase
      * \param compIdx index of the component
      */
+    using Base::fugacityCoefficient;
     template <class FluidState>
     static Scalar fugacityCoefficient(const FluidState &fluidState,
                                       int phaseIdx,
@@ -407,7 +407,6 @@ public:
         return std::numeric_limits<Scalar>::infinity();
     }
 
-    using Base::diffusionCoefficient;
     /*!
      * \brief Calculate the binary molecular diffusion coefficient for
      *        a component in a fluid phase \f$\mathrm{[mol^2 * s / (kg*m^3)]}\f$
@@ -430,6 +429,7 @@ public:
      * where \f$\mathrm{p_\alpha}\f$ and \f$\mathrm{T_\alpha}\f$ are the fluid phase'
      * pressure and temperature.
      */
+    using Base::diffusionCoefficient;
     template <class FluidState>
     static Scalar diffusionCoefficient(const FluidState &fluidState,
                                        int phaseIdx,
@@ -440,7 +440,6 @@ public:
                    " immiscibility is assumed");
     }
 
-    using Base::binaryDiffusionCoefficient;
     /*!
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
@@ -450,6 +449,7 @@ public:
      * \param compIIdx index of the component i
      * \param compJIdx index of the component j
      */
+    using Base::binaryDiffusionCoefficient;
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
                                              int phaseIdx,
@@ -462,12 +462,12 @@ public:
                    " immiscibility is assumed");
     }
 
-    using Base::enthalpy;
     /*!
      * \brief Return the specific enthalpy of a fluid phase \f$\mathrm{[J/kg]}\f$.
      * \param fluidState The fluid state of the two-phase model
      * \param phaseIdx Index of the fluid phase
      */
+    using Base::enthalpy;
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
                                  int phaseIdx)
@@ -481,12 +481,12 @@ public:
         return Fluid1::enthalpy(temperature, pressure);
     }
 
-    using Base::thermalConductivity;
     /*!
      * \brief Thermal conductivity of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
      * \param fluidState The fluid state of the two-phase model
      * \param phaseIdx Index of the fluid phase
      */
+    using Base::thermalConductivity;
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
                                       int phaseIdx)
@@ -500,7 +500,6 @@ public:
         return Fluid1::thermalConductivity(temperature, pressure);
     }
 
-    using Base::heatCapacity;
     /*!
      * @copybrief Base::thermalConductivity
      *
@@ -512,6 +511,7 @@ public:
      * \param fluidState The fluid state of the two-phase model
      * \param phaseIdx for which phase to give back the heat capacity
      */
+    using Base::heatCapacity;
     template <class FluidState>
     static Scalar heatCapacity(const FluidState &fluidState,
                                int phaseIdx)

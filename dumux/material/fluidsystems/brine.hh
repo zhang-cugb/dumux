@@ -217,12 +217,12 @@ public:
         }
     }
 
-    using Base::density;
     /*!
      * \brief Return the phase density [kg/m^3].
      * \note The density is compuated as a function of the salt mass fraction
      */
     template <class FluidState>
+    using Base::density;
     static Scalar density(const FluidState& fluidState, int phaseIdx = liquidPhaseIdx)
     {
         assert(phaseIdx == liquidPhaseIdx);
@@ -249,7 +249,6 @@ public:
         return density;
     }
 
-    using Base::fugacityCoefficient;
     /*!
      * \copybrief Base::fugacityCoefficient
      *
@@ -258,6 +257,7 @@ public:
      * \param compIdx The index of the component to consider
      */
     template <class FluidState>
+    using Base::fugacityCoefficient;
     static Scalar fugacityCoefficient(const FluidState &fluidState,
                                       int phaseIdx,
                                       int compIdx)
@@ -274,11 +274,11 @@ public:
         return std::numeric_limits<Scalar>::infinity();
     }
 
-    using Base::viscosity;
     /*!
      * \brief Return the viscosity of the phase.
      */
     template <class FluidState>
+    using Base::viscosity;
     static Scalar viscosity(const FluidState& fluidState, int phaseIdx = liquidPhaseIdx)
     {
         assert(phaseIdx == liquidPhaseIdx);
@@ -319,7 +319,6 @@ public:
             DUNE_THROW(Dune::NotImplemented, "Invalid component index " << compIdx);
     }
 
-    using Base::enthalpy;
     /*!
      * \brief Given a phase's composition, temperature and pressure,
      *        return its specific enthalpy \f$\mathrm{[J/kg]}\f$.
@@ -334,6 +333,7 @@ public:
      *
      */
     template <class FluidState>
+    using Base::enthalpy;
     static Scalar enthalpy(const FluidState& fluidState, int phaseIdx)
     {
         /*Numerical coefficients from PALLISER*/
@@ -404,7 +404,6 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid phase index " << phaseIdx);
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$ of
      *        the fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -415,23 +414,23 @@ public:
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\kappa} \;.\f]
      */
     template <class FluidState>
+    using Base::molarDensity;
     static Scalar molarDensity(const FluidState& fluidState, int phaseIdx = liquidPhaseIdx)
     {
         return density(fluidState, phaseIdx)/fluidState.averageMolarMass(phaseIdx);
     }
 
-    using Base::diffusionCoefficient;
     /*!
      * \brief Returns the diffusion coefficient \f$\mathrm{[-]}\f$
      *        of a component in a phase.
      */
     template <class FluidState>
+    using Base::diffusionCoefficient;
     static Scalar diffusionCoefficient(const FluidState& fluidState, int phaseIdx, int compIdx)
     {
         DUNE_THROW(Dune::NotImplemented, "FluidSystems::Brine::diffusionCoefficient()");
     }
 
-    using Base::binaryDiffusionCoefficient;
     /*!
      * \brief Given a phase's composition, temperature and pressure,
      *        return the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
@@ -442,6 +441,7 @@ public:
      * \param compJIdx Index of the component j
      */
     template <class FluidState>
+    using Base::binaryDiffusionCoefficient;
     static Scalar binaryDiffusionCoefficient(const FluidState& fluidState,
                                              int phaseIdx,
                                              int compIIdx,
@@ -469,7 +469,6 @@ public:
          DUNE_THROW(Dune::InvalidStateException, "Invalid phase index: " << phaseIdx);
     }
 
-    using Base::thermalConductivity;
     /*!
      * \brief Thermal conductivity of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
      * \param fluidState An abitrary fluid state
@@ -480,6 +479,7 @@ public:
      *       would have to find out its influence.
      */
     template <class FluidState>
+    using Base::thermalConductivity;
     static Scalar thermalConductivity(const FluidState& fluidState, int phaseIdx)
     {
         if (phaseIdx == liquidPhaseIdx)
@@ -487,7 +487,6 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid phase index: " << phaseIdx);
     }
 
-    using Base::heatCapacity;
     /*!
      * \brief Specific isobaric heat capacity of a fluid phase.
      *        \f$\mathrm{[J/(kg*K)}\f$.
@@ -498,6 +497,7 @@ public:
      *       description of the influence of NaCl on the phase property has to be found.
      */
     template <class FluidState>
+    using Base::heatCapacity;
     static Scalar heatCapacity(const FluidState &fluidState, int phaseIdx)
     {
         if (phaseIdx == liquidPhaseIdx)

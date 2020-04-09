@@ -233,7 +233,6 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid component index " << compIdx);
     }
 
-    using Base::density;
     /*!
      * \brief Given a phase's composition, temperature, pressure, and
      *        the partial pressures of all components, return its
@@ -246,6 +245,7 @@ public:
      * \param fluidState The fluid state
      * \param phaseIdx The index of the phase
      */
+    using Base::density;
     template <class FluidState>
     static Scalar density(const FluidState &fluidState, int phaseIdx)
     {
@@ -278,7 +278,6 @@ public:
                + NAPL::gasDensity(fluidState.temperature(phaseIdx), pNAPL);
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -288,6 +287,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{\overline M_\alpha} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx)
     {
@@ -310,7 +310,6 @@ public:
         }
     }
 
-    using Base::viscosity;
     /*!
      * \brief Return the viscosity of a phase \f$\mathrm{[Pa s]}\f$.
      * \param fluidState The fluid state
@@ -318,6 +317,7 @@ public:
      *
      * \todo Check the parameter phiCAW for the xylene case and give a physical meaningful name
      */
+    using Base::viscosity;
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
                             int phaseIdx)
@@ -385,8 +385,6 @@ public:
         return muResult;
     }
 
-
-    using Base::diffusionCoefficient;
     /*!
      * \brief Given all mole fractions, return the diffusion
      *        coefficient \f$\mathrm{[m^2/s]}\f$ of a component in a phase.
@@ -394,6 +392,7 @@ public:
      * \param phaseIdx The index of the phase to consider
      * \param compIdx The index of the component to consider
      */
+    using Base::diffusionCoefficient;
     template <class FluidState>
     static Scalar diffusionCoefficient(const FluidState &fluidState,
                                        int phaseIdx,
@@ -457,7 +456,6 @@ public:
         DUNE_THROW(Dune::NotImplemented, "FluidSystems::H2OAirXylene::binaryDiffusionCoefficient()");
     }
 
-    using Base::fugacityCoefficient;
     /*!
      * \brief Returns the fugacity coefficient \f$\mathrm{[-]}\f$ of a component in a
      *        phase.
@@ -471,6 +469,7 @@ public:
      * respectively in the liquid phases it is the Henry coefficients
      * divided by pressure.
      */
+    using Base::fugacityCoefficient;
     template <class FluidState>
     static Scalar fugacityCoefficient(const FluidState &fluidState,
                                       int phaseIdx,
@@ -520,7 +519,6 @@ public:
         DUNE_THROW(Dune::NotImplemented, "FluidSystems::H2OAirXylene::kelvinVaporPressure()");
     }
 
-    using Base::enthalpy;
     /*!
      * \brief Given all mole fractions in a phase, return the specific
      *        phase enthalpy \f$\mathrm{[J/kg]}\f$.
@@ -530,6 +528,7 @@ public:
      *  \note This system neglects the contribution of gas-molecules in the liquid phase.
      *        This contribution is probably not big. Somebody would have to find out the enthalpy of solution for this system. ...
      */
+    using Base::enthalpy;
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
                            int phaseIdx)
@@ -603,12 +602,12 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid phase index " << phaseIdx);
     }
 
-    using Base::heatCapacity;
     /*!
      * \brief Return the heat capacity in \f$\mathrm{[J/(kg K)]}\f$.
      * \param fluidState The fluid state
      * \param phaseIdx The index of the phase
      */
+    using Base::heatCapacity;
     template <class FluidState>
     static Scalar heatCapacity(const FluidState &fluidState,
                                int phaseIdx)
@@ -616,12 +615,12 @@ public:
         DUNE_THROW(Dune::NotImplemented, "FluidSystems::H2OAirXylene::heatCapacity()");
     }
 
-    using Base::thermalConductivity;
     /*!
      * \brief Return the thermal conductivity \f$\mathrm{[W/(m K)]}\f$.
      * \param fluidState The fluid state
      * \param phaseIdx The index of the phase
      */
+    using Base::thermalConductivity;
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
                                       int phaseIdx)

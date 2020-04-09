@@ -116,7 +116,6 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid component index " << compIdx);;
     }
 
-    using Base::binaryDiffusionCoefficient;
     /*!
      * \brief Given a phase's composition, temperature and pressure,
      *        returns the binary diffusion coefficient \f$\mathrm{[m^2/s]}\f$ for components
@@ -127,6 +126,7 @@ public:
      * \param compIIdx The index of the first component to consider
      * \param compJIdx The index of the second component to consider
      */
+    using Base::binaryDiffusionCoefficient;
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
                                              int phaseIdx,
@@ -149,7 +149,7 @@ public:
                        "Binary diffusion coefficient of components "
                        << compIIdx << " and " << compJIdx << " is undefined!\n");
     }
-    using Base::density;
+
     /*!
      * \brief Given a phase's composition, temperature, pressure, and
      *        the partial pressures of all components, returns its
@@ -158,6 +158,7 @@ public:
      * \param phaseIdx index of the phase
      * \param fluidState the fluid state
      */
+    using Base::density;
     template <class FluidState>
     static Scalar density(const FluidState &fluidState,
                           const int phaseIdx)
@@ -167,13 +168,13 @@ public:
         return IdealGas::molarDensity(T, p) * fluidState.averageMolarMass(0);
     }
 
-    using Base::viscosity;
     /*!
      * \brief Calculates the dynamic viscosity of a fluid phase \f$\mathrm{[Pa*s]}\f$
      *
      * \param fluidState An arbitrary fluid state
      * \param phaseIdx The index of the fluid phase to consider
      */
+    using Base::viscosity;
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
                             int phaseIdx)
@@ -181,7 +182,6 @@ public:
         return 1e-6;
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -191,6 +191,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\kappa} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx)
     {

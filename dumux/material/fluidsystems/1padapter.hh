@@ -182,10 +182,10 @@ public:
     static Scalar molarMass(int compIdx)
     {  return MultiPhaseFluidSystem::molarMass(AdapterPolicy::compIdx(compIdx)); }
 
-    using Base::density;
     /*!
      * \brief The density \f$\mathrm{[kg/m^3]}\f$ of the component at a given pressure and temperature.
      */
+    using Base::density;
     template <class FluidState>
     static Scalar density(const FluidState &fluidState, int phaseIdx = 0)
     {
@@ -193,7 +193,6 @@ public:
         return MultiPhaseFluidSystem::density(adaptFluidState(fluidState), phase);
     }
 
-    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -203,6 +202,7 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\alpha} \;.\f]
      */
+    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, int phaseIdx = 0)
     {
@@ -210,10 +210,10 @@ public:
         return MultiPhaseFluidSystem::molarDensity(adaptFluidState(fluidState), phase);
     }
 
-    using Base::enthalpy;
     /*!
      * \brief Specific enthalpy \f$\mathrm{[J/kg]}\f$ the pure component as a liquid.
      */
+    using Base::enthalpy;
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState, int phaseIdx = 0)
     {
@@ -238,10 +238,10 @@ public:
                                                         AdapterPolicy::compIdx(compIdx));
     }
 
-    using Base::viscosity;
     /*!
      * \brief The dynamic liquid viscosity \f$\mathrm{[N/m^3*s]}\f$ of the pure component.
      */
+    using Base::viscosity;
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState, int phaseIdx = 0)
     {
@@ -249,7 +249,6 @@ public:
         return MultiPhaseFluidSystem::viscosity(adaptFluidState(fluidState), phase);
     }
 
-    using Base::fugacityCoefficient;
     /*!
      * \copybrief Base::fugacityCoefficient
      *
@@ -257,6 +256,7 @@ public:
      * \param phaseIdx The index of the fluid phase to consider
      * \param compIdx The index of the component to consider
      */
+    using Base::fugacityCoefficient;
     template <class FluidState>
     static Scalar fugacityCoefficient(const FluidState &fluidState,
                                       int phaseIdx,
@@ -267,7 +267,6 @@ public:
                                                           AdapterPolicy::compIdx(compIdx));
     }
 
-    using Base::diffusionCoefficient;
     /*!
      * \copybrief Base::diffusionCoefficient
      *
@@ -275,6 +274,7 @@ public:
      * \param phaseIdx The index of the fluid phase to consider
      * \param compIdx The index of the component to consider
      */
+    using Base::diffusionCoefficient;
     template <class FluidState>
     static Scalar diffusionCoefficient(const FluidState &fluidState,
                                        int phaseIdx,
@@ -285,7 +285,6 @@ public:
                                                            AdapterPolicy::compIdx(compIdx));
     }
 
-    using Base::binaryDiffusionCoefficient;
     /*!
      * \copybrief Base::binaryDiffusionCoefficient
      *
@@ -294,6 +293,7 @@ public:
      * \param compIIdx The index of the component to consider
      * \param compJIdx The index of the component to consider
      */
+    using Base::binaryDiffusionCoefficient;
     template <class FluidState>
     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
                                              int phaseIdx,
@@ -306,10 +306,10 @@ public:
                                                                  AdapterPolicy::compIdx(compJIdx));
     }
 
-    using Base::thermalConductivity;
     /*!
      * \brief Thermal conductivity of the fluid \f$\mathrm{[W/(m K)]}\f$.
      */
+    using Base::thermalConductivity;
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
                                       int phaseIdx = 0)
@@ -318,10 +318,10 @@ public:
         return MultiPhaseFluidSystem::thermalConductivity(adaptFluidState(fluidState), phase);
     }
 
-    using Base::heatCapacity;
     /*!
      * \brief Specific isobaric heat capacity of the fluid \f$\mathrm{[J/(kg K)]}\f$.
      */
+    using Base::heatCapacity;
     template <class FluidState>
     static Scalar heatCapacity(const FluidState &fluidState,
                                int phaseIdx = 0)
