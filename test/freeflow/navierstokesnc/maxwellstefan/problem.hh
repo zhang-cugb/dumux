@@ -145,6 +145,7 @@ public:
                        "Binary diffusion coefficient of components "
                        << compIIdx << " and " << compJIdx << " is undefined!\n");
     }
+
     using Base::density;
    /*!
      * \brief Given a phase's composition, temperature, pressure, and

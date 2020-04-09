@@ -236,11 +236,11 @@ public:
         DUNE_THROW(Dune::InvalidStateException, "Invalid component index " << compIdx);
     }
 
+    using Base::density;
     /*!
      * \brief Given all mole fractions in a phase, return the phase
      *        density [kg/m^3].
      */
-    using Base::density;
     template <class FluidState>
     static Scalar density(const FluidState &fluidState, int phaseIdx)
     {
@@ -304,10 +304,10 @@ public:
         }
     }
 
+    using Base::viscosity;
     /*!
      * \brief Return the viscosity of a phase.
      */
-    using Base::viscosity;
     template <class FluidState>
     static Scalar viscosity(const FluidState &fluidState,
                             int phaseIdx)
@@ -480,8 +480,7 @@ public:
             DUNE_THROW(Dune::InvalidStateException, "non-existent component index " << compIdx);
     }
 
-
-
+    using Base::enthalpy;
     /*!
      * \brief Given all mole fractions in a phase, return the specific
      *        phase enthalpy\f$\mathrm{[J/kg]}\f$.
@@ -489,7 +488,6 @@ public:
      *        This contribution is probably not big.
      *        Somebody would have to find out the enthalpy of solution for this system. ...
      */
-    using Base::enthalpy;
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
                            int phaseIdx)
@@ -562,6 +560,7 @@ public:
         DUNE_THROW(Dune::NotImplemented, "FluidSystems::H2ONAPL::heatCapacity()");
     }
 
+    using Base::thermalConductivity;
     /*!
      * \brief Thermal conductivity of a fluid phase \f$\mathrm{[W/(m K)]}\f$.
      *
@@ -570,7 +569,6 @@ public:
      * \param fluidState An arbitrary fluid state
      * \param phaseIdx The index of the fluid phase to consider
      */
-    using Base::thermalConductivity;
     template <class FluidState>
     static Scalar thermalConductivity(const FluidState &fluidState,
                                       int phaseIdx)

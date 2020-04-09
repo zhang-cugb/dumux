@@ -201,6 +201,7 @@ public:
     static Scalar molarDensity(Scalar temperature, Scalar pressure)
     { return Component::gasMolarDensity(temperature, pressure); }
 
+    using Base::molarDensity;
     /*!
      * \brief The molar density \f$\rho_{mol,\alpha}\f$
      *   of a fluid phase \f$\alpha\f$ in \f$\mathrm{[mol/m^3]}\f$
@@ -210,7 +211,6 @@ public:
      *
      * \f[\rho_{mol,\alpha} = \frac{\rho_\alpha}{M_\alpha} \;.\f]
      */
-    using Base::molarDensity;
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState,
                                const int phaseIdx)
@@ -235,10 +235,10 @@ public:
     static const Scalar enthalpy(Scalar temperature, Scalar pressure)
     {  return Component::gasEnthalpy(temperature, pressure); }
 
+    using Base::enthalpy;
     /*!
      * \brief Specific enthalpy \f$\mathrm{[J/kg]}\f$ the pure component as a liquid.
      */
-    using Base::enthalpy;
     template <class FluidState>
     static Scalar enthalpy(const FluidState &fluidState,
                            const int phaseIdx)
