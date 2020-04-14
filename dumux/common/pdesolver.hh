@@ -26,11 +26,12 @@
 
 #include <memory>
 
+#include <dune/common/hybridutilities.hh>
+
 #include <dumux/common/typetraits/matrix.hh>
 #include <dumux/common/timeloop.hh>
 
 namespace Dumux {
-
 /*!
  * \ingroup Common
  * \brief A high-level interface for a PDESolver
