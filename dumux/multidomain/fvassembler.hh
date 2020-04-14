@@ -38,6 +38,7 @@
 #include <dumux/discretization/method.hh>
 #include <dumux/assembly/diffmethod.hh>
 #include <dumux/assembly/jacobianpattern.hh>
+#include <dumux/assembly/matrixindexset.hh>
 
 #include "couplingjacobianpattern.hh"
 #include "subdomaincclocalassembler.hh"
@@ -77,6 +78,9 @@ public:
 
     template<std::size_t id>
     using GridGeometry = typename MDTraits::template SubDomain<id>::GridGeometry;
+
+    template<std::size_t id>
+    using IndexType = typename GridGeometry<id>::GridView::IndexSet::IndexType;
 
     template<std::size_t id>
     using Problem = typename MDTraits::template SubDomain<id>::Problem;
@@ -194,6 +198,12 @@ public:
             auto& subRes = (*residual_)[domainId];
             this->assembleJacobianAndResidual_(domainId, jacRow, subRes, curSol);
         });
+
+        resetReducedCoefficientMatrix_();
+        resetReducedRHS_();
+
+        fillReducedCoefficientMatrix_(*jacobian_, *reducedCoefficientMatrix_, *furtherReducedCoefficientMatrix_);
+        fillReducedRHS_(*residual_, *reducedRHS_);
     }
 
     //! compute the residuals using the internal residual
@@ -201,6 +211,9 @@ public:
     {
         resetResidual_();
         assembleResidual(*residual_, curSol);
+
+        resetReducedResidual_();
+        fillReducedResidual_(*residual_, *reducedResidual_);
     }
 
     //! assemble a residual r
@@ -248,6 +261,24 @@ public:
         setJacobianPattern(*jacobian_);
         setResidualSize(*residual_);
     }
+
+     /*!
+     * \brief The version without arguments uses the default constructor to create
+     *        the coefficient matrix and right-hand side objects in this assembler if you don't need them outside this class
+     */
+    void setReducedLinearSystem()
+    {
+        reducedCoefficientMatrix_ = std::make_shared<JacobianMatrix>();
+        furtherReducedCoefficientMatrix_ = std::make_shared<JacobianMatrix>();
+        reducedRHS_ = std::make_shared<SolutionVector>();
+
+        setJacobianBuildMode(*reducedCoefficientMatrix_);
+        setJacobianBuildMode(*furtherReducedCoefficientMatrix_);
+
+        setReducedCoefficientMatrixPattern(*jacobian_, *reducedCoefficientMatrix_, *furtherReducedCoefficientMatrix_);
+        setReducedRHSSize(*reducedRHS_);
+    }
+
 
     /*!
      * \brief The version without arguments uses the default constructor to create
@@ -299,6 +330,22 @@ public:
     }
 
     /*!
+     * \brief Sets the reduced coefficient matrix' sparsity pattern.
+     */
+    void setReducedCoefficientMatrixPattern(const JacobianMatrix& coefficientMatrix, JacobianMatrix& reducedCoefficientMatrix, JacobianMatrix& furtherReducedCoefficientMatrix)
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(coefficientMatrix)), [&](const auto domainI)
+        {
+            forEach(integralRange(Dune::Hybrid::size(coefficientMatrix[domainI])), [&](const auto domainJ)
+            {
+                this->setPatternDeleteSetOfRowsFromBCRSMatrix_(coefficientMatrix[domainI][domainJ], reducedCoefficientMatrix[domainI][domainJ], this->reductionIndexSet(domainI));
+                this->setPatternDeleteSetOfColumnsFromBCRSMatrix_(reducedCoefficientMatrix[domainI][domainJ], furtherReducedCoefficientMatrix[domainI][domainJ], this->reductionIndexSet(domainJ));
+            });
+        });
+    }
+
+    /*!
      * \brief Resizes the residual
      */
     void setResidualSize(SolutionVector& res) const
@@ -327,6 +374,43 @@ public:
         forEach(integralRange(Dune::Hybrid::size(gridVariablesTuple_)), [&](const auto domainId)
         { this->gridVariables(domainId).resetTimeStep(curSol[domainId]); });
     }
+
+     /*!
+     * \brief Resizes the right-hand side
+     */
+    void setRHSSize(SolutionVector& RHS) const
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(RHS)), [&](const auto domainId)
+        { RHS[domainId].resize(this->numDofs(domainId)); });
+    }
+
+    // Get the set of cell center dof indices which should be deleted from the coefficient matrix
+    template<std::size_t i>
+    //TODO: make it std::vector<IndexType>
+    std::vector<unsigned int> reductionIndexSet(Dune::index_constant<i> domainI) const
+    {
+        if (i == 0)
+        {
+            return problem(domainI).fixedPressureScvsIndexSet();
+        }
+        else
+        {
+            // Get the set of face dof indices which should be deleted from the coefficient matri
+            return problem(domainI).dirichletBoundaryScvfsIndexSet();
+        }
+    }
+
+    /*!
+     * \brief Resizes the reduced right-hand side
+     */
+    void setReducedRHSSize(SolutionVector& reducedRHS) const
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(reducedRHS)), [&](const auto domainId)
+        { reducedRHS[domainId].resize(this->numDofs(domainId) - this->reductionIndexSet(domainId).size()); });
+    }
+
 
     //! the number of dof locations of domain i
     template<std::size_t i>
@@ -370,6 +454,17 @@ public:
     SolutionVector& residual()
     { return *residual_; }
 
+    //! the full reduced coefficient matrix
+    JacobianMatrix& reducedCoefficientMatrix()
+    { return *furtherReducedCoefficientMatrix_; }
+
+    //! the full reduced right-hand side vector
+    SolutionVector& reducedRHS()
+    { return *reducedRHS_; }
+
+    SolutionVector& reducedResidual()
+    { return *reducedResidual_; }
+
     //! the solution of the previous time step
     const SolutionVector& prevSol() const
     { return *prevSol_; }
@@ -401,6 +496,50 @@ public:
     LocalResidual<i> localResidual(Dune::index_constant<i> domainId) const
     { return LocalResidual<i>(std::get<domainId>(problemTuple_).get(), timeLoop_.get()); }
 
+    /*!
+    * \tparam indices A set of indices that the to-be-deleted elements have in the vector.
+    */
+        // an example to illustrate the tought behind the loops in the following:
+        // let us assume the scvfs are 0,1,...,10 with 5 and 8 being boundary scvfs
+        // then we would like to delete the fifth and eightth entry of the RHS vector
+        // we do so by copying new[0] = old [0], new[1] = old [1], new[2] = old [2], new[3] = old [3],
+        // new[4] = old [4], new[5] = old [6], new[6] = old [7], new[7] = old [9], new[8] = old[10]
+        // this could be achieved by new[i] = old [i], i=0,1,2,3,4
+        // new [i-1] = old [i], i=6,7
+        // new [i-2] = old [i], i=9,10
+        // this means i should go over everything apart the boundary scvfs
+        // and we need new [i-number of faces that we already left out]
+    template<class VectorType, class IndexType>
+    void removeSetOfEntriesFromVector (VectorType& vector, const std::vector<IndexType>& indices){
+        if (indices.size() == 0) { return ;}
+
+        std::vector<IndexType> tmpIndices = indices;
+        std::sort (tmpIndices.begin(), tmpIndices.end());
+
+        VectorType tmpVector;
+        tmpVector.resize(vector.size() - tmpIndices.size());
+
+        //fill intermediate reduced indices for A - delete rows
+        int numBoundaryScvfsAlreadyHandled = 0;
+        //k=0
+        for (unsigned int i = 0; i < tmpIndices[0]; ++i){
+            tmpVector[i] = vector[i];
+        }
+        numBoundaryScvfsAlreadyHandled ++;
+        for (unsigned int k = 1; k < tmpIndices.size(); ++k){
+            //k is related to the boundary scvf up to which I want to go
+            for (unsigned int i = (tmpIndices[k-1]+1); i < tmpIndices[k]; ++i){
+                tmpVector[i-numBoundaryScvfsAlreadyHandled] = vector[i];
+            }
+            numBoundaryScvfsAlreadyHandled ++;
+        }
+        for (unsigned int i = tmpIndices[tmpIndices.size()-1]+1; i < vector.size(); ++i){
+            tmpVector[i-numBoundaryScvfsAlreadyHandled] = vector[i];
+        }
+
+        vector = tmpVector;
+    }
+
 protected:
     //! the coupling manager coupling the sub domains
     std::shared_ptr<CouplingManager> couplingManager_;
@@ -418,6 +557,30 @@ private:
         (*residual_) = 0.0;
     }
 
+    // reset the reduced right-hand side vector to 0.0
+    void resetReducedRHS_()
+    {
+        if(!reducedRHS_)
+        {
+            reducedRHS_ = std::make_shared<SolutionVector>();
+            setReducedRHSSize(*reducedRHS_);
+        }
+
+        (*reducedRHS_) = 0.0;
+    }
+
+    // reset the reduced right-hand side vector to 0.0
+    void resetReducedResidual_()
+    {
+        if(!reducedResidual_)
+        {
+            reducedResidual_ = std::make_shared<SolutionVector>();
+            setReducedRHSSize(*reducedResidual_);
+        }
+
+        (*reducedResidual_) = 0.0;
+    }
+
     // reset the jacobian vector to 0.0
     void resetJacobian_()
     {
@@ -429,6 +592,32 @@ private:
         }
 
        (*jacobian_)  = 0.0;
+    }
+
+    // reset the reduced coefficient matrix vector to 0.0
+    void resetReducedCoefficientMatrix_()
+    {
+        if(!reducedCoefficientMatrix_ && !furtherReducedCoefficientMatrix_)
+        {
+            reducedCoefficientMatrix_ = std::make_shared<JacobianMatrix>();
+            furtherReducedCoefficientMatrix_ = std::make_shared<JacobianMatrix>();
+
+            setJacobianBuildMode(*reducedCoefficientMatrix_);
+            setJacobianBuildMode(*furtherReducedCoefficientMatrix_);
+
+            setReducedCoefficientMatrixPattern(*jacobian_, *reducedCoefficientMatrix_, *furtherReducedCoefficientMatrix_);
+        }
+        else if (!reducedCoefficientMatrix_ && furtherReducedCoefficientMatrix_)
+        {
+            DUNE_THROW(Dune::InvalidStateException, "Furhter reduced coefficient matrix set but reduced one not");
+        }
+        else if (reducedCoefficientMatrix_ && !furtherReducedCoefficientMatrix_)
+        {
+            DUNE_THROW(Dune::InvalidStateException, "Reduced coefficient matrix set but further reduced one not.");
+        }
+
+       (*reducedCoefficientMatrix_)  = 0.0;
+       (*furtherReducedCoefficientMatrix_) = 0.0;
     }
 
     // check if the assembler is in a correct state for assembly
@@ -499,6 +688,180 @@ private:
                                                         domainJ, gridGeometry(domainJ));
     }
 
+    template<class MatrixType, class IndexType>
+    void setPatternDeleteSetOfRowsFromBCRSMatrix_(const MatrixType& matrixBefore, MatrixType& matrixAfter, const std::vector<IndexType>& entries){
+        Dune::SimpleMatrixIndexSet occupationPatternA;
+        occupationPatternA.resize(matrixBefore.N(), matrixBefore.M());
+        occupationPatternA.import(matrixBefore);
+
+        if (entries.size() > 0){
+            std::vector<std::set<std::size_t> >* indicesAPtr = occupationPatternA.getPtrToIndices();
+            removeSetOfEntriesFromVector(*indicesAPtr, entries);
+            occupationPatternA.resize(matrixBefore.N() - entries.size(),  matrixBefore.M());
+        }
+
+        occupationPatternA.exportIdx(matrixAfter);
+    }
+
+    template<class MatrixType, class IndexType>
+    void setPatternDeleteSetOfColumnsFromBCRSMatrix_(const MatrixType& matrixBefore, MatrixType& matrixAfter, const std::vector<IndexType>& entries){
+        Dune::SimpleMatrixIndexSet occupationPatternA;
+        occupationPatternA.resize(matrixBefore.N(), matrixBefore.M());
+        occupationPatternA.import(matrixBefore);
+
+        if (entries.size() > 0){
+            std::vector<std::set<std::size_t> >* indicesAPtr = occupationPatternA.getPtrToIndices();
+            for (auto& vecElem : *indicesAPtr){
+                removeSetOfPossiblyContainedEntriesFromStdSet_(vecElem, entries);
+            }
+            occupationPatternA.resize(matrixBefore.N(), matrixBefore.M() - entries.size());
+        }
+
+        occupationPatternA.exportIdx(matrixAfter);
+    }
+
+    /*!
+    * \tparam set The set that something should be removed from.
+    * \tparam entries The values which should be removed if present in the set.
+    */
+        //For understanding: The sets std::set contain the row indices as numbers. Every row index larger than the first boundary scvf has to be shifted, even if the set itself does not contain any boudary scvfs. Indices, which are, before the shifting process, boundary scvfs, have to be deleted.
+    template<class DataType, class IndexType>
+    void removeSetOfPossiblyContainedEntriesFromStdSet_ (std::set<DataType>& set, const std::vector<IndexType>& entries){
+        std::vector<IndexType> tmpEntries = entries;
+        std::sort (tmpEntries.begin(), tmpEntries.end());
+
+        int numBoundaryScvfsAlreadyHandled = 0;
+        unsigned int goOnJ = 0;
+
+        std::set<DataType> tmp;
+
+        for (unsigned int k = 0; k < tmpEntries.size(); ++k){
+            //the following loop over j goes (typically) over 0,1,2,3
+            for (unsigned int j = goOnJ; j < set.size(); ++j){
+                typename std::set<DataType>::iterator itIntermediateReducedA  = std::next(set.begin(), j);
+                if (*itIntermediateReducedA > tmpEntries[k]){
+                    numBoundaryScvfsAlreadyHandled ++;
+                    goOnJ = j;
+                    break;
+                }
+                else if (*itIntermediateReducedA == tmpEntries[k]){
+                    numBoundaryScvfsAlreadyHandled ++;
+                    goOnJ = j+1;
+                    break;
+                }
+                tmp.insert((*itIntermediateReducedA) - numBoundaryScvfsAlreadyHandled);
+            }
+        }
+        //for larger than last boundaryScvfsIndex
+        for (unsigned int j = goOnJ; j < set.size(); ++j){
+            typename std::set<DataType>::iterator itIntermediateReducedA = std::next(set.begin(), j);
+            tmp.insert((*itIntermediateReducedA) - numBoundaryScvfsAlreadyHandled);
+        }
+        set = tmp;
+    }
+
+    //! fill the reduced coefficient matrix to 0.0
+    void fillReducedCoefficientMatrix_(const JacobianMatrix& coefficientMatrix, JacobianMatrix& reducedCoefficientMatrix, JacobianMatrix& furtherReducedCoefficientMatrix)
+    {
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(coefficientMatrix)), [&](const auto domainI)
+        {
+            forEach(integralRange(Dune::Hybrid::size(coefficientMatrix[domainI])), [&](const auto domainJ)
+            {
+                this->fillDeleteSetOfRowsFromBCRSMatrix_(coefficientMatrix[domainI][domainJ], reducedCoefficientMatrix[domainI][domainJ], this->reductionIndexSet(domainI));
+                this->fillDeleteSetOfColumnsFromBCRSMatrix_(reducedCoefficientMatrix[domainI][domainJ], furtherReducedCoefficientMatrix[domainI][domainJ], this->reductionIndexSet(domainJ));
+            });
+        });
+    }
+
+    template<class MatrixType, class IndexType>
+    void fillDeleteSetOfRowsFromBCRSMatrix_(const MatrixType& matrixBefore, MatrixType& matrixAfter, const std::vector<IndexType>& entries){
+        if (entries.size() == 0)
+        {
+            matrixAfter = matrixBefore;
+            return;
+        }
+
+        std::vector<IndexType> tmpEntries = entries;
+        std::sort (tmpEntries.begin(), tmpEntries.end());
+
+        int numBoundaryScvfsAlreadyHandled = 0;
+        //k=0
+        for (unsigned int i = 0; i < tmpEntries[0]; ++i){
+            //copy i-th row
+            matrixAfter[i] = matrixBefore[i];
+        }
+        numBoundaryScvfsAlreadyHandled ++;
+        for (unsigned int k = 1; k < tmpEntries.size(); ++k){
+            //k is related to the boundary scvf up to which I want to go
+            for (unsigned int i = (tmpEntries[k-1]+1); i < tmpEntries[k]; ++i){
+                 matrixAfter[i-numBoundaryScvfsAlreadyHandled] = matrixBefore[i];
+            }
+            numBoundaryScvfsAlreadyHandled ++;
+        }
+        for (unsigned int i = tmpEntries[tmpEntries.size()-1]+1; i < matrixBefore.N(); ++i){
+            matrixAfter[i-numBoundaryScvfsAlreadyHandled] = matrixBefore[i];
+        }
+    }
+
+    template<class MatrixType, class IndexType>
+    void fillDeleteSetOfColumnsFromBCRSMatrix_(const MatrixType& matrixBefore, MatrixType& matrixAfter, const std::vector<IndexType>& entries){
+        std::vector<IndexType> tmpEntries = entries;
+        std::sort (tmpEntries.begin(), tmpEntries.end());
+
+        Dune::SimpleMatrixIndexSet occupationPatternC;
+        occupationPatternC.resize(matrixBefore.N(), matrixBefore.M());
+        occupationPatternC.import(matrixBefore);
+
+        std::vector<std::set<std::size_t> > indicesC;
+        occupationPatternC.getIndices(indicesC);
+
+        for (unsigned int i = 0; i < indicesC.size(); ++i){
+            int numBoundaryScvfsAlreadyHandled = 0;
+            unsigned int goOnJ = 0;
+            for (unsigned int k = 0; k < tmpEntries.size(); ++k){
+                //the following loop over j goes (typically) over 0,1,2,3
+                for (unsigned int j = goOnJ; j < indicesC[i].size(); ++j){
+                    std::set<std::size_t>::iterator itC = std::next(indicesC[i].begin(), j);
+                    if (*itC > tmpEntries[k]){
+                        numBoundaryScvfsAlreadyHandled ++;
+                        goOnJ = j;
+                        break;
+                    }
+                    else if (*itC == tmpEntries[k]){
+                        numBoundaryScvfsAlreadyHandled ++;
+                        goOnJ = j+1;
+                        break;
+                    }
+                    matrixAfter[i][*itC - numBoundaryScvfsAlreadyHandled] = matrixBefore[i][*itC];
+                }
+            }
+            //for k larger than last boundaryScvfsIndex
+            for (unsigned int j = goOnJ; j < indicesC[i].size(); ++j){
+                std::set<std::size_t>::iterator itC = std::next(indicesC[i].begin(), j);
+                matrixAfter[i][*itC - numBoundaryScvfsAlreadyHandled] = matrixBefore[i][*itC];
+            }
+        }
+    }
+
+    void fillReducedRHS_(const SolutionVector& RHS, SolutionVector& reducedRHS)
+    {
+        reducedRHS = RHS;
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(reducedRHS)), [&](const auto domainId)
+        { this->removeSetOfEntriesFromVector(reducedRHS[domainId], this->reductionIndexSet(domainId)); });
+    }
+
+    void fillReducedResidual_(const SolutionVector& Residual, SolutionVector& reducedResidual)
+    {
+        reducedResidual = Residual;
+        using namespace Dune::Hybrid;
+        forEach(integralRange(Dune::Hybrid::size(reducedResidual)), [&](const auto domainId)
+        { this->removeSetOfEntriesFromVector(reducedResidual[domainId], this->reductionIndexSet(domainId)); });
+    }
+
+
+
     //! pointer to the problem to be solved
     ProblemTuple problemTuple_;
 
@@ -520,6 +883,10 @@ private:
     //! shared pointers to the jacobian matrix and residual
     std::shared_ptr<JacobianMatrix> jacobian_;
     std::shared_ptr<SolutionVector> residual_;
+    std::shared_ptr<JacobianMatrix> reducedCoefficientMatrix_;
+    std::shared_ptr<SolutionVector> reducedRHS_;
+    std::shared_ptr<SolutionVector> reducedResidual_;
+    std::shared_ptr<JacobianMatrix> furtherReducedCoefficientMatrix_;
 };
 
 } // end namespace Dumux

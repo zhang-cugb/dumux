@@ -38,6 +38,8 @@
 #include <dumux/multidomain/staggeredtraits.hh>
 #include <dumux/multidomain/staggeredcouplingmanager.hh>
 
+#include <dumux/discretization/staggered.hh>
+
 #include "diffmethod.hh"
 
 namespace Dumux {
@@ -69,6 +71,9 @@ public:
     using GridGeometry = GetPropType<TypeTag, Properties::GridGeometry>;
     using GridVariables = GetPropType<TypeTag, Properties::GridVariables>;
     using CouplingManager = typename ParentType::CouplingManager;
+
+    using CellCenterSolutionVector = GetPropType<TypeTag, Properties::CellCenterSolutionVector>;
+    using FaceSolutionVector = GetPropType<TypeTag, Properties::FaceSolutionVector>;
 
     //! The constructor for stationary problems
     StaggeredFVAssembler(std::shared_ptr<const Problem> problem,
@@ -109,6 +114,8 @@ public:
     const GridGeometry& gridGeometry() const
     { return ParentType::gridGeometry(Dune::index_constant<0>()).actualGridGeometry(); }
 
+    const auto& problem() const
+    { return ParentType::problem(Dune::index_constant<0>()); }
 };
 
 } // namespace Dumux
