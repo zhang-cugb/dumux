@@ -264,8 +264,12 @@ private:
     static std::size_t getSize_(const MultiTypeBlockVector& b)
     {
         std::size_t size = 0;
-        Dune::Hybrid::forEach(b, [&size](const auto& subVector)
+
+        std::cout << "Dune::Hybrid::size(b) = " << Dune::Hybrid::size(b) << std::endl;
+
+        Dune::Hybrid::forEach(Dune::Hybrid::integralRange(Dune::Hybrid::size(b)), [&](const auto domainId)
         {
+            const auto& subVector = b[domainId];
             // the size of the individual vector blocks equals the respective number of equations.
             const auto numEq = std::decay_t<decltype(subVector)>::block_type::size();
             size += numEq * subVector.size();
