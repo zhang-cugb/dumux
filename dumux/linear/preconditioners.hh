@@ -106,8 +106,13 @@ public:
      * \param mat The matrix to operate on.
      * \param params Collection of paramters.
      */
-    SeqUzawa(const std::shared_ptr<const Dune::AssembledLinearOperator<M,X,Y>>& mat, const Dune::ParameterTree& params)
-    : matrix_(mat->getmat())
+#if DUNE_VERSION_GT(DUNE_ISTL,2,7)
+    SeqUzawa(const std::shared_ptr<const Dune::AssembledLinearOperator<M,X,Y>>& op, const Dune::ParameterTree& params)
+    : matrix_(op->getmat())
+#else
+    SeqUzawa(const M& mat, const Dune::ParameterTree& params)
+    : matrix_(mat)
+#endif
     , numIterations_(params.get<std::size_t>("iterations"))
     , relaxationFactor_(params.get<scalar_field_type>("relaxation"))
     , verbosity_(params.get<int>("verbosity"))
