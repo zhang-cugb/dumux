@@ -46,6 +46,7 @@
 #include <dumux/common/typetraits/matrix.hh>
 #include <dumux/linear/solver.hh>
 #include <dumux/linear/parallelhelpers.hh>
+#include <dumux/linear/istlsolverregistry.hh>
 
 namespace Dumux {
 
