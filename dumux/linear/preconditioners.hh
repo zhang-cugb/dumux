@@ -29,7 +29,6 @@
 #include <dune/common/indices.hh>
 #include <dune/istl/preconditioners.hh>
 #include <dune/istl/paamg/amg.hh>
-#include <dune/common/version.hh>
 
 #if HAVE_UMFPACK
 #include <dune/istl/umfpack.hh>
@@ -37,10 +36,7 @@
 
 #include <dumux/common/parameters.hh>
 #include <dumux/common/typetraits/matrix.hh>
-
-#if DUNE_VERSION_NEWER_REV(DUNE_ISTL,2,7,1)
 #include <dumux/linear/istlsolverregistry.hh>
-#endif
 
 namespace Dumux {
 
@@ -329,9 +325,7 @@ private:
     const bool useDirectVelocitySolverForA_;
 };
 
-#if DUNE_VERSION_NEWER_REV(DUNE_ISTL,2,7,1)
 DUMUX_REGISTER_PRECONDITIONER("uzawa", Dumux::MultiTypeBlockMatrixPreconditionerTag, Dune::defaultPreconditionerBlockLevelCreator<Dumux::SeqUzawa, 1>());
-#endif
 
 } // end namespace Dumux
 
