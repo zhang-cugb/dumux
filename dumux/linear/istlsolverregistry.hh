@@ -26,10 +26,9 @@
 #define DUMUX_LINEAR_ISTL_SOLVER_REGISTRY_HH
 
 #include <dune/common/version.hh>
-#if DUNE_VERSION_NEWER_REV(DUNE_ISTL,2,7,1)
+#if DUNE_VERSION_GTE(DUNE_ISTL,2,7)
 
 #include <dune/istl/common/registry.hh>
-#include <dune/istl/solverregistry.hh>
 
 /*!
  * \brief Register a Dumux preconditioner
