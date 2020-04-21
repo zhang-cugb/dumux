@@ -27,6 +27,15 @@ which we specialize a number of compile-time `properties`.
 #include <dumux/discretization/box.hh> // for `TTag::BoxModel`
 ```
 
+The `OneP` type tag specializes most of the `properties` required for single-
+phase flow simulations in DuMuX. We will use this in the following to inherit the
+respective properties, and subsequently specialize those properties for our
+type tag, which we want to modify or for which no meaningful default can be set.
+
+```cpp
+#include <dumux/porousmediumflow/1p/model.hh> // for `TTag::OneP`
+```
+
 The local residual for incompressible flow is included.
 The one-phase flow model (included above) uses a default implementation of the
 local residual for single-phase flow. However, in this example we are using an
@@ -36,15 +45,6 @@ the Jacobian matrix. We will use this in the main file.
 
 ```cpp
 #include <dumux/porousmediumflow/1p/incompressiblelocalresidual.hh>
-```
-
-The `OneP` type tag specializes most of the `properties` required for single-
-phase flow simulations in DuMuX. We will use this in the following to inherit the
-respective properties, and subsequently specialize those properties for our
-type tag, which we want to modify or for which no meaningful default can be set.
-
-```cpp
-#include <dumux/porousmediumflow/1p/model.hh> // for `TTag::OneP`
 ```
 
 We will use a single liquid phase consisting of a component with constant fluid properties.
@@ -217,7 +217,7 @@ properties and boundary conditions, from the input file.
         k_ = getParam<Scalar>("SpatialParams.Permeability");
         nu_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
 
-        // The inner radius p1 can be determined from the grid
+        // The inner radius r1 can be determined from the grid
         r1_ = gridGeometry->bBoxMin()[0];
 
         // boundary conditions
