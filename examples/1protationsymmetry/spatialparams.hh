@@ -34,7 +34,7 @@
 // ### The spatial parameters class
 //
 // In the `RotSymExampleSpatialParams` class, we define the functions needed to describe
-// the porous medium, that is, porosity and permeability..
+// the porous medium, that is, porosity and permeability.
 // We inherit from the `FVSpatialParamsOneP` class here, which is the base class
 // for spatial parameters in the context of single-phase porous medium flow
 // applications using finite volume discretization schemes.

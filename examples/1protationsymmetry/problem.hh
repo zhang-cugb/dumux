@@ -47,18 +47,23 @@ class RotSymExampleProblem : public PorousMediumFlowProblem<TypeTag>
     using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
 
 public:
-    // In the constructor, we obtain a number of parameters from the input file.
+    // In the constructor, we obtain a number of parameters, related to fluid
+    // properties and boundary conditions, from the input file.
     // [[codeblock]]
     RotSymExampleProblem(std::shared_ptr<const GridGeometry> gridGeometry)
     : ParentType(gridGeometry)
     {
+        // fluid properties
         k_ = getParam<Scalar>("SpatialParams.Permeability");
         nu_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
-        q_ = getParam<Scalar>("Problem.Source");
-        pW_ = getParam<Scalar>("Problem.WellPressure");
 
-        // The well radius
-        rW_ = gridGeometry->bBoxMin()[0];
+        // The inner radius p1 can be determined from the grid
+        r1_ = gridGeometry->bBoxMin()[0];
+
+        // boundary conditions
+        q1_ = getParam<Scalar>("Problem.Q1"); // mass flux into the domain at r1 in kg/s/m
+        p1_ = getParam<Scalar>("Problem.P1"); // pressure at the inner boundary at r1
+
     }
     // [[/codeblock]]
 
@@ -82,27 +87,34 @@ public:
 
     // #### Specify Dirichlet boundary condition values
     // This function is used to specify the values of the primary variables at Dirichlet boundaries.
-    // Here, we evaluate the analytical solution to define the pressures at the boundaries.
+    // Here, we evaluate the analytical solution (see below) to define the pressures at the boundaries.
     PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
     { return exactSolution(globalPos); }
 
     // #### Analytical solution
-    // There exists an analytical solution to the problem that is solved in this example.
-    // The following function evaluates this solution depending on the position in the
-    // domain. We use this function here both to specify Dirichlet boundaries and to
-    // evaluate the error of the numerical solutions obtained for different levels of
-    // grid refinement.
+    // The analytical solution to the problem of this example reads:
+    //
+    // ```math
+    // p = p (r) = p_1 - \frac{q_1 \nu}{2 \pi k} \text{ln} (\frac{r}{r_1}),
+    // ```
+    //
+    // where $`q_1`$ is the mass flux into the domain at the inner radius $`r_1`$
+    // (in kg/s/m) and $`\nu = \mu/\varrho`$ is the kinematic viscosity.
+    // The following function evaluates this solution depending on the
+    // position in the domain. We use this function here both to specify Dirichlet
+    // boundaries and to evaluate the error of the numerical solutions obtained for
+    // different levels of grid refinement.
     // [[codeblock]]
     PrimaryVariables exactSolution(const GlobalPosition& globalPos) const
     {
         const auto r = globalPos[0];
-        const auto p = pW_ - 1.0/(2*M_PI)*nu_/k_*q_*std::log(r/rW_);
+        const auto p = p1_ - 1.0/(2*M_PI)*nu_/k_*q1_*std::log(r/r1_);
         return p;
     }
 
 private:
     // private data members required for the analytical solution
-    Scalar q_, k_, nu_, rW_, pW_;
+    Scalar q1_, k_, nu_, r1_, p1_;
 };
 
 } // end namespace Dumux

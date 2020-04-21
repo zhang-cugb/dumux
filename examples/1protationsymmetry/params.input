@@ -1,8 +1,8 @@
 [Problem]
-Name = rotationsymmetry
-Source = -10.0
-WellPressure = 1e5
 EnableGravity = 0 # disable gravity
+Name = rotationsymmetry
+P1 = 1e5   # pressure at the inner boundary at r1
+Q1 = -10.0 # mass flux into the domain at r1 in kg/s/m
 
 [Grid]
 LowerLeft = 0.05

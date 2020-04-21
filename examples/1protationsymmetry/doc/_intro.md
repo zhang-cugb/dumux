@@ -13,7 +13,7 @@ the pressure distribution of this example looks as shown in the following pictur
 <figure>
     <center>
         <img src="img/result.png" alt="Rotation-symmetric pressure distribution" width="60%"/>
-        <figcaption> <b> Fig.1 </b> - Result TODO.</figcaption>
+        <figcaption> <b> Fig.1 </b> - Rotation-symmetric pressure distribution on a disc (warped to 3D). </figcaption>
     </center>
 </figure>
 
