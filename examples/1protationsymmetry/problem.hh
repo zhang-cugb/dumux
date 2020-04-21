@@ -57,7 +57,7 @@ public:
         k_ = getParam<Scalar>("SpatialParams.Permeability");
         nu_ = getParam<Scalar>("Component.LiquidKinematicViscosity");
 
-        // The inner radius p1 can be determined from the grid
+        // The inner radius r1 can be determined from the grid
         r1_ = gridGeometry->bBoxMin()[0];
 
         // boundary conditions
