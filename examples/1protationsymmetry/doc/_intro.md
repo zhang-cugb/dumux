@@ -47,11 +47,11 @@ the above figure.
 ## Mathematical model
 
 In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
-the Darcy velocity $`\textbf v`$ to gradients of the pressure $`p`$. In the case of rotational
+the Darcy velocity $`\textbf u`$ to gradients of the pressure $`p`$. In the case of rotational
 symmetry, this can be written as:
 
 ```math
-v = - \frac{k}{\mu} \frac{\partial p}{\partial r}.
+u = - \frac{k}{\mu} \frac{\partial p}{\partial r}.
 ```
 
 Here, $`k`$ is the permeability of the porous medium and $`\mu`$ is the dynamic viscosity of the
@@ -59,7 +59,7 @@ fluid. In the model, the mass balance equation for the fluid phase is solved, wh
 polar coordinates:
 
 ```math
-\frac{1}{r} \frac{\partial \left( r \varrho v \right)}{\partial r} = 0,
+\frac{1}{r} \frac{\partial \left( r \varrho u \right)}{\partial r} = 0,
 ```
 
 where $`\phi`$ is the porosity of the porous medium and $`\varrho`$ is the fluid density.
@@ -71,7 +71,7 @@ The discrete equation describing mass conservation inside a control volume $`K`$
 by integration and reads:
 
 ```math
-    \sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho v \right)_\sigma
+    \sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho u \right)_\sigma
     = 0,
 ```
 
