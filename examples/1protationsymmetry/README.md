@@ -33,7 +33,7 @@ The following figure illustrates the setup:
 <figure>
     <center>
         <img src="img/setup.svg" alt="Rotation-symmetric setup" width="60%"/>
-        <figcaption> <b> Fig.1 </b> - Setup for the rotation-symmetric problem. The pressure boundary conditions are shown by the colored lines and the simulation domain is depicted in grey.</figcaption>
+        <figcaption> <b> Fig.2 </b> - Setup for the rotation-symmetric problem. The pressure boundary conditions are shown by the colored lines and the simulation domain is depicted in grey.</figcaption>
     </center>
 </figure>
 
