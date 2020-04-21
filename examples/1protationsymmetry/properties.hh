@@ -84,7 +84,7 @@ template<class TypeTag>
 struct Problem<TypeTag, TTag::OnePRotSym>
 { using type = RotSymExampleProblem<TypeTag>; };
 
-// Our spatial parameters class defining permeability and porosity of the porous medium:
+// Our spatial parameters class defining the permeability and porosity of the porous medium:
 template<class TypeTag>
 struct SpatialParams<TypeTag, TTag::OnePRotSym>
 {
@@ -124,9 +124,12 @@ private:
     using DefaultTraits = BoxDefaultGridGeometryTraits<GridView>;
 
     // On the basis of the default traits, define the traits for rotational symmetry.
+    // These will export the corresponding rotation-symmetric sub-control volumes and faces.
     using GGTraits = RotationSymmetricGridGeometryTraits<DefaultTraits, RotationPolicy::disc>;
 
 public:
+    // Pass the above traits to the box grid geometry such that it uses the
+    // rotation-symmetric sub-control volumes and faces.
     using type = BoxFVGridGeometry<Scalar, GridView, enableCache, GGTraits>;
 };
 // [[/codeblock]]
