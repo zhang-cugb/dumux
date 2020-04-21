@@ -50,21 +50,13 @@ the above figure.
 
 In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
 the Darcy velocity $`\textbf u`$ to gradients of the pressure $`p`$. In the case of rotational
-symmetry, this can be written as:
+symmetry, the mass balance equation for the fluid phase can be transformed using polar coordinates:
 
 ```math
-u = - \frac{k}{\mu} \frac{\partial p}{\partial r}.
+-\frac{1}{r} \frac{\partial}{\partial r} \left( r  \frac{\varrho k}{\mu} \frac{\partial p}{\partial r} \right) = 0.
 ```
-
-Here, $`k`$ is the permeability of the porous medium and $`\mu`$ is the dynamic viscosity of the
-fluid. In the model, the mass balance equation for the fluid phase is solved, which reads in
-polar coordinates:
-
-```math
-\frac{1}{r} \frac{\partial \left( r \varrho u \right)}{\partial r} = 0,
-```
-
-where $`\phi`$ is the porosity of the porous medium and $`\varrho`$ is the fluid density.
+Here, $`k`$ is the permeability of the porous medium, $`\mu`$ is the dynamic viscosity of the
+fluid, $`\phi`$ is the porosity, and $`\varrho`$ is the fluid density.
 
 ## Discretization
 
