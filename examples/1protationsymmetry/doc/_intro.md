@@ -51,31 +51,44 @@ the Darcy velocity $`\textbf u`$ to gradients of the pressure $`p`$. In the case
 symmetry, the mass balance equation for the fluid phase can be transformed using polar coordinates:
 
 ```math
--\frac{1}{r} \frac{\partial}{\partial r} \left( r  \frac{\varrho k}{\mu} \frac{\partial p}{\partial r} \right) = 0.
+-\frac{1}{r} \frac{\partial}{\partial r} \left( r  \frac{\varrho k}{\mu} \frac{\partial p}{\partial r} \right) = 0,
 ```
-Here, $`k`$ is the permeability of the porous medium, $`\mu`$ is the dynamic viscosity of the
-fluid, $`\phi`$ is the porosity, and $`\varrho`$ is the fluid density.
+
+where we identify the Darcy velocity in radial direction $`u_r = -\frac{k}{\mu} \frac{\partial p}{\partial r}`$,
+and where $`k`$ is the permeability of the porous medium, $`\mu`$ is the dynamic viscosity of the
+fluid, and $`\varrho`$ is the fluid density.
 
 ## Discretization
 
 We employ a finite-volume scheme to spatially discretize the mass balance equation shown above.
-The discrete equation describing mass conservation inside a control volume $`K`$ is obtained
-by integration and reads:
+Let us consider a discretization of the one-dimensional domain into control volumes
+$`K_i = \left[ r_i, r_{i+1} \right]`$. The discrete equation describing mass conservation inside a control volume
+$`K_i`$ is obtained by integration and reads:
 
 ```math
-    \sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho u \right)_\sigma
-    = 0,
+    - 2 \pi r_{i+1} \left( \varrho u_r \right)_{r_{i+1}}
+    + 2 \pi r_i \left( \varrho u_r \right)_{r_i}
+    = 0.
 ```
 
-where $`\sigma`$ are the faces of the control volume such that
-$`\bigcup_{\sigma \in \mathcal{S}_K} \sigma \equiv \partial K`$ and where the notation
-$`( \cdot )_\sigma`$ was used to denote quantities evaluated for a
-face $`\sigma`$. The area of a face is denoted with $`| \sigma |`$.
+For this type of equation, the implementation of the finite-volume schemes in DuMuX is based on
+the general form:
 
-DuMuX provides the classes `RotationSymmetricSubControlVolume` and
+```math
+\sum_{\sigma \in \mathcal{S}_K} | \sigma | \left( \varrho \textbf u \cdot \textbf n \right)_\sigma = 0,
+```
+
+where $`\sigma`$ are the faces of the control volume and where the notation
+$`( \cdot )_\sigma`$ was used to denote quantities evaluated for a face $`\sigma`$.
+The area of a face is denoted with $`| \sigma |`$. Thus, comparing the two equations
+we identify $`| \sigma | = 2 \pi r_\sigma`$ for the case of rotational symmetry
+on a disc. Here, $`r_\sigma`$ refers to the radius at which the face is situated
+in the one-dimensional discretization.
+
+In DuMuX, this is realized in the classes `RotationSymmetricSubControlVolume` and
 `RotationSymmetricSubControlVolumeFace`, which implement one-dimensional control
-volumes and faces, that, in the computations of volumes and areas, take into account
-the extrusion about the rotation axes of symmetry. This will be discussed in part 1
+volumes and faces, that take into account the extrusion about the rotation axes
+of symmetry in the computations of volumes and areas. This will be discussed in part 1
 of the documentation.
 
 # Implementation & Post processing
