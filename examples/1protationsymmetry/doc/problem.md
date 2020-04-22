@@ -28,7 +28,7 @@ which we specialize a number of compile-time `properties`.
 ```
 
 The `OneP` type tag specializes most of the `properties` required for single-
-phase flow simulations in DuMuX. We will use this in the following to inherit the
+phase flow simulations in DuMu<sup>x</sup>. We will use this in the following to inherit the
 respective properties, and subsequently specialize those properties for our
 type tag, which we want to modify or for which no meaningful default can be set.
 
@@ -54,7 +54,7 @@ We will use a single liquid phase consisting of a component with constant fluid 
 #include <dumux/material/fluidsystems/1pliquid.hh>
 ```
 
-As mentioned at the beginning of the documentation of this example, DuMuX
+As mentioned at the beginning of the documentation of this example, DuMu<sup>x</sup>
 provides specialized implementations of control volumes and faces for
 rotation-symmetric problems. These take care of adjusting volume and area
 computations to account for the extrusion about the symmetry axes.
@@ -124,7 +124,7 @@ public:
 };
 ```
 
-As mentioned before, DuMuX provides specialized implementations of sub-control
+As mentioned before, DuMu<sup>x</sup> provides specialized implementations of sub-control
 volumes and faces for rotation-symmetric problems, which are exported by the
 `RotationSymmetricGridGeometryTraits`.
 Here, we pass these traits to the grid geometry of the box scheme (the scheme

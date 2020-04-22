@@ -46,7 +46,7 @@ the above figure.
 
 ## Mathematical model
 
-In this example we are using the single-phase model of DuMuX, which considers Darcy's law to relate
+In this example we are using the single-phase model of DuMu<sup>x</sup>, which considers Darcy's law to relate
 the Darcy velocity $`\textbf u`$ to gradients of the pressure $`p`$. In the case of rotational
 symmetry, the mass balance equation for the fluid phase can be transformed using polar coordinates:
 
@@ -71,7 +71,7 @@ $`K_i`$ is obtained by integration and reads:
     = 0.
 ```
 
-For this type of equation, the implementation of the finite-volume schemes in DuMuX is based on
+For this type of equation, the implementation of the finite-volume schemes in DuMu<sup>x</sup> is based on
 the general form:
 
 ```math
@@ -85,7 +85,7 @@ we identify $`| \sigma | = 2 \pi r_\sigma`$ for the case of rotational symmetry
 on a disc. Here, $`r_\sigma`$ refers to the radius at which the face is situated
 in the one-dimensional discretization.
 
-In DuMuX, this is realized in the classes `RotationSymmetricSubControlVolume` and
+In DuMu<sup>x</sup>, this is realized in the classes `RotationSymmetricSubControlVolume` and
 `RotationSymmetricSubControlVolumeFace`, which implement one-dimensional control
 volumes and faces, that take into account the extrusion about the rotation axes
 of symmetry in the computations of volumes and areas. This will be discussed in part 1
