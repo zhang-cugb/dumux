@@ -4,10 +4,8 @@
 #include <dune/python/pybind11/pybind11.h>
 #include <dune/python/pybind11/stl.h>
 
-#include <dumux/material/components/liquid.hh>
-#include <dumux/material/components/gas.hh>
-#include <dumux/material/components/solid.hh>
-#include <dumux/material/components/ion.hh>
+#include <dumux/material/components/componenttraits.hh>
+
 
 namespace Dumux::Python {
 
@@ -15,7 +13,7 @@ namespace Dumux::Python {
 
 template <class Comp, class... options>
 void registerComponent(pybind11::handle scope,
-                          pybind11::class_<Comp, options...> cls)
+                       pybind11::class_<Comp, options...> cls)
 {
     using pybind11::operator""_a;
 
@@ -23,18 +21,10 @@ void registerComponent(pybind11::handle scope,
         return new Comp();
     }));
 
-    using Scalar = typename Comp::Scalar;
-
-    static constexpr bool isLiquid = std::is_base_of<Dumux::Components::Liquid<Scalar, Comp>, Comp>::value;
-    static constexpr bool isGas = std::is_base_of<Dumux::Components::Gas<Scalar, Comp>, Comp>::value;
-    static constexpr bool isSolid = std::is_base_of<Dumux::Components::Solid<Scalar, Comp>, Comp>::value;
-    static constexpr bool isIon = std::is_base_of<Dumux::Components::Ion<Scalar, Comp>, Comp>::value;
-
     cls.def_static("name", &Comp::name);
     cls.def_static("molarMass", &Comp::molarMass);
 
-
-    if constexpr (isLiquid)
+    if constexpr (ComponentTraits<Comp>::hasLiquidState)
     {
         cls.def_static("liquidDensity", &Comp::liquidDensity, "temperature"_a, "pressure"_a);
         cls.def_static("liquidMolarDensity", &Comp::liquidMolarDensity, "temperature"_a, "pressure"_a);
@@ -47,7 +37,7 @@ void registerComponent(pybind11::handle scope,
         cls.def_static("vaporPressure", &Comp::vaporPressure, "temperature"_a);
     }
 
-    if constexpr (isGas)
+    if constexpr (ComponentTraits<Comp>::hasGasState)
     {
         cls.def_static("gasDensity", &Comp::gasDensity, "temperature"_a, "pressure"_a);
         cls.def_static("gasMolarDensity", &Comp::gasMolarDensity, "temperature"_a, "pressure"_a);
@@ -61,7 +51,7 @@ void registerComponent(pybind11::handle scope,
         cls.def_static("gasThermalConductivity", &Comp::gasThermalConductivity, "temperature"_a, "pressure"_a);
     }
 
-    if constexpr (isSolid)
+    if constexpr (ComponentTraits<Comp>::hasSolidState)
     {
         cls.def_static("solidIsCompressible", &Comp::solidIsCompressible);
         cls.def_static("solidDensity", &Comp::solidDensity, "temperature_a");
@@ -69,12 +59,12 @@ void registerComponent(pybind11::handle scope,
         cls.def_static("solidHeatCapacity", &Comp::solidHeatCapacity, "temperature_a");
     }
 
-    if constexpr (isIon)
+    if constexpr (ComponentTraits<Comp>::isIon)
     {
         cls.def_static("charge", &Comp::charge);
     }
 
-    if constexpr (isLiquid || isGas)
+    if constexpr (ComponentTraits<Comp>::hasLiquidState || ComponentTraits<Comp>::hasGasState)
     {
         cls.def_static("criticalTemperature", &Comp::criticalTemperature);
         cls.def_static("criticalPressure", &Comp::criticalPressure);
