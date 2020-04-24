@@ -12,6 +12,7 @@
 
 #include <dumux/material/fluidsystems/base.hh>
 #include <dumux/material/components/componenttraits.hh>
+#include <dumux/python/material/fluidstate.hh>
 #include <dumux/io/name.hh>
 
 #include <dune/common/fvector.hh>
@@ -21,31 +22,55 @@
 #include <dune/python/pybind11/pybind11.h>
 #include <dune/python/pybind11/embed.h>
 
+#include <dumux/python/material/fluidstate.hh>
+#include <dumux/material/fluidstates/compositional.hh>
+
 
 
 namespace Dumux::FluidSystems::Python {
+
+namespace Detail {
+template <std::size_t size, class F, std::size_t I = 0>
+inline auto switchSequenceCall([[maybe_unused]] std::size_t i, F&& f)
+-> decltype(f(std::integral_constant<std::size_t, 0>{}))
+{
+    if constexpr(I < size) {
+        switch (i) {
+            case I: return f(std::integral_constant<std::size_t, I>{});
+            default: return switchSequenceCall<size, F, I+1>(i, std::forward<F>(f));
+        }
+    }
+    else
+        DUNE_THROW(Dune::InvalidStateException, "Index out of range!");
+}
+
+}
 /*!
  * \ingroup Fluidsystems
  * \brief A liquid phase consisting of a single component
  */
-template <class Scalar, class ComponentT>
+template <class Scalar, class ...ComponentT>
 class OnePLiquid
-: public FluidSystems::Base<Scalar, OnePLiquid<Scalar, ComponentT> >
+: public FluidSystems::Base<Scalar, OnePLiquid<Scalar, ComponentT...> >
 {
-    using ThisType = OnePLiquid<Scalar, ComponentT>;
+    using ThisType = OnePLiquid<Scalar, ComponentT...>;
     using Base = Dumux::FluidSystems::Base<Scalar, ThisType>;
 
-    static_assert(ComponentTraits<ComponentT>::hasLiquidState, "The component does not implement a liquid state!");
+    static_assert(std::conjunction_v<std::integral_constant<bool, ComponentTraits<ComponentT>::hasLiquidState>...>,
+                  "One of the components does not implement a liquid state!");
+
 
 public:
-    using Component = ComponentT;
+    template<std::size_t i>
+    using Component = typename std::tuple_element_t<i, std::tuple<ComponentT...>>;
+
     using ParameterCache = NullParameterCache;
 
-    static constexpr int numPhases = 1;  //!< Number of phases in the fluid system
-    static constexpr int numComponents = 1; //!< Number of components in the fluid system
+    static constexpr std::size_t numPhases = 1;  //!< Number of phases in the fluid system
+    static constexpr std::size_t numComponents = sizeof...(ComponentT); //!< Number of components in the fluid system
 
-    static constexpr int phase0Idx = 0; //!< index of the only phase
-    static constexpr int comp0Idx = 0; //!< index of the only component
+    static constexpr std::size_t phase0Idx = 0; //!< index of the only phase
+    static constexpr std::size_t comp0Idx = 0; //!< index of the only component
 
     /*!
      * \brief Initialize the fluid system's static parameters generically
@@ -70,13 +95,13 @@ public:
      * \param compIdx The index of the component to consider
      */
     static std::string componentName(int compIdx = 0)
-    { return Component::name(); }
-
-    /*!
-     * \brief A human readable name for the component.
-     */
-    static std::string name()
-    { return Component::name(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::name();
+        });
+    }
 
     /*!
      * \brief There is only one phase, so not mass transfer between phases can occur
@@ -111,13 +136,13 @@ public:
      * \brief Returns true if the fluid is assumed to be compressible
      */
     static constexpr bool isCompressible(int phaseIdx = 0)
-    { return Component::liquidIsCompressible(); }
+    { return std::disjunction_v<std::integral_constant<bool, ComponentT::liquidIsCompressible()>...>; }
 
     /*!
      * \brief Returns true if the fluid viscosity is constant
      */
     static constexpr bool viscosityIsConstant(int phaseIdx = 0)
-    { return Component::liquidViscosityIsConstant(); }
+    { return std::conjunction_v<std::integral_constant<bool, ComponentT::liquidViscosityIsConstant()>...>; }
 
     /*!
      * \brief Returns true if the fluid is assumed to be an ideal gas
@@ -129,38 +154,70 @@ public:
      * \brief The mass in \f$\mathrm{[kg]}\f$ of one mole of the component.
      */
     static Scalar molarMass(int compIdx = 0)
-    {  return Component::molarMass(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::molarMass();
+        });
+    }
 
     /*!
      * \brief Returns the critical temperature \f$\mathrm{[K]}\f$ of the component
      */
     static Scalar criticalTemperature(int compIdx = 0)
-    {  return Component::criticalTemperature(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::criticalTemperature();
+        });
+    }
 
     /*!
      * \brief Returns the critical pressure \f$\mathrm{[Pa]}\f$ of the component
      */
     static Scalar criticalPressure(int compIdx = 0)
-    {  return Component::criticalPressure(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::criticalPressure();
+        });
+    }
 
     /*!
      * \brief Returns the temperature \f$\mathrm{[K]}\f$ at the component's triple point.
      */
     static Scalar tripleTemperature(int compIdx = 0)
-    {  return Component::tripleTemperature(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::tripleTemperature();
+        });
+    }
 
     /*!
      * \brief Returns the pressure \f$\mathrm{[Pa]}\f$ at the component's triple point.
      */
     static Scalar triplePressure(int compIdx = 0)
-    { return Component::triplePressure(); }
+    {
+        return Detail::switchSequenceCall<numComponents>(compIdx, [](auto _compIdx)
+        {
+            constexpr auto compIdx = std::decay_t<decltype(_compIdx)>::value;
+            return Component<compIdx>::triplePressure();
+        });
+    }
 
     /*!
      * \brief The vapor pressure in \f$\mathrm{[Pa]}\f$ of the component at a given
      *        temperature.
      */
-    static Scalar vaporPressure(Scalar T)
-    {  return Component::vaporPressure(T); }
+    static Scalar vaporPressure(Scalar temperature)
+    {
+        return pythonFluidSytem_().attr("vaporPressure")(temperature).template cast<Scalar>();
+    }
 
     /*!
      * \brief The density \f$\mathrm{[kg/m^3]}\f$ of the component at a given pressure and temperature.
@@ -287,82 +344,89 @@ public:
             return 1.0;
         return std::numeric_limits<Scalar>::infinity();
     }
-//
-//     using Base::diffusionCoefficient;
-//     /*!
-//      * \copybrief Base::diffusionCoefficient
-//      *
-//      * \param fluidState An arbitrary fluid state
-//      * \param phaseIdx The index of the fluid phase to consider
-//      * \param compIdx The index of the component to consider
-//      */
-//     template <class FluidState>
-//     static Scalar diffusionCoefficient(const FluidState &fluidState,
-//                                        int phaseIdx,
-//                                        int compIdx)
-//     {
-//         DUNE_THROW(Dune::InvalidStateException, "Not applicable: Diffusion coefficients");
-//     }
-//
-//     using Base::binaryDiffusionCoefficient;
-//     /*!
-//      * \copybrief Base::binaryDiffusionCoefficient
-//      *
-//      * \param fluidState An arbitrary fluid state
-//      * \param phaseIdx The index of the fluid phase to consider
-//      * \param compIIdx The index of the component to consider
-//      * \param compJIdx The index of the component to consider
-//      */
-//     template <class FluidState>
-//     static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
-//                                              int phaseIdx,
-//                                              int compIIdx,
-//                                              int compJIdx)
-//     {
-//         DUNE_THROW(Dune::InvalidStateException, "Not applicable: Binary diffusion coefficients");
-//     }
-//
-//     /*!
-//      * \brief Thermal conductivity of the fluid \f$\mathrm{[W/(m K)]}\f$.
-//      */
-//     static Scalar thermalConductivity(Scalar temperature, Scalar pressure)
-//     { return Component::liquidThermalConductivity(temperature, pressure); }
-//
-//     using Base::thermalConductivity;
-//     /*!
-//      * \brief Thermal conductivity of the fluid \f$\mathrm{[W/(m K)]}\f$.
-//      */
-//     template <class FluidState>
-//     static Scalar thermalConductivity(const FluidState &fluidState,
-//                                       const int phaseIdx)
-//     {
-//         return thermalConductivity(fluidState.temperature(phaseIdx),
-//                                    fluidState.pressure(phaseIdx));
-//     }
-//
-//     /*!
-//      * \brief Specific isobaric heat capacity of the fluid \f$\mathrm{[J/(kg K)]}\f$.
-//      */
-//     static Scalar heatCapacity(Scalar temperature, Scalar pressure)
-//     { return Component::liquidHeatCapacity(temperature, pressure); }
-//
-//     using Base::heatCapacity;
-//     /*!
-//      * \brief Specific isobaric heat capacity of the fluid \f$\mathrm{[J/(kg K)]}\f$.
-//      */
-//     template <class FluidState>
-//     static Scalar heatCapacity(const FluidState &fluidState,
-//                                const int phaseIdx)
-//     {
-//         return heatCapacity(fluidState.temperature(phaseIdx),
-//                             fluidState.pressure(phaseIdx));
-//     }
+
+    using Base::diffusionCoefficient;
+    /*!
+     * \copybrief Base::diffusionCoefficient
+     *
+     * \param fluidState An arbitrary fluid state
+     * \param phaseIdx The index of the fluid phase to consider
+     * \param compIdx The index of the component to consider
+     */
+    template <class FluidState>
+    static Scalar diffusionCoefficient(const FluidState &fluidState,
+                                       int phaseIdx,
+                                       int compIdx)
+    {
+        return pythonFluidSytem_().attr("diffusionCoefficient")(fluidState, phaseIdx, compIdx).template cast<Scalar>();
+    }
+
+    using Base::binaryDiffusionCoefficient;
+    /*!
+     * \copybrief Base::binaryDiffusionCoefficient
+     *
+     * \param fluidState An arbitrary fluid state
+     * \param phaseIdx The index of the fluid phase to consider
+     * \param compIIdx The index of the component to consider
+     * \param compJIdx The index of the component to consider
+     */
+    template <class FluidState>
+    static Scalar binaryDiffusionCoefficient(const FluidState &fluidState,
+                                             int phaseIdx,
+                                             int compIIdx,
+                                             int compJIdx)
+    {
+        return pythonFluidSytem_().attr("binaryDiffusionCoefficient")(fluidState, phaseIdx, compIIdx, compJIdx).template cast<Scalar>();
+    }
+
+    /*!
+     * \brief Thermal conductivity of the fluid \f$\mathrm{[W/(m K)]}\f$.
+     */
+    static Scalar thermalConductivity(Scalar temperature, Scalar pressure)
+    {
+        return pythonFluidSytem_().attr("thermalConductivity")(temperature, pressure).template cast<Scalar>();
+    }
+
+    using Base::thermalConductivity;
+    /*!
+     * \brief Thermal conductivity of the fluid \f$\mathrm{[W/(m K)]}\f$.
+     */
+    template <class FluidState>
+    static Scalar thermalConductivity(const FluidState &fluidState,
+                                      const int phaseIdx)
+    {
+        return pythonFluidSytem_().attr("thermalConductivity")(fluidState, phaseIdx).template cast<Scalar>();
+    }
+
+    /*!
+     * \brief Specific isobaric heat capacity of the fluid \f$\mathrm{[J/(kg K)]}\f$.
+     */
+    static Scalar heatCapacity(Scalar temperature, Scalar pressure)
+    {
+        return pythonFluidSytem_().attr("heatCapacity")(temperature, pressure).template cast<Scalar>();
+    }
+
+    using Base::heatCapacity;
+    /*!
+     * \brief Specific isobaric heat capacity of the fluid \f$\mathrm{[J/(kg K)]}\f$.
+     */
+    template <class FluidState>
+    static Scalar heatCapacity(const FluidState &fluidState,
+                               const int phaseIdx)
+    {
+        return heatCapacity(fluidState.temperature(phaseIdx),
+                            fluidState.pressure(phaseIdx));
+    }
 private:
 
     static pybind11::object& pythonFluidSytem_()
     {
         static pybind11::scoped_interpreter guard{};
         static pybind11::object pyFluidSystem = pybind11::module::import("pythonfluidsystem");
+
+        using FS = Dumux::CompositionalFluidState<Scalar, ThisType>;
+        Dumux::Python::Impl::registerFluidState<FS>(pyFluidSystem);
+
         return pyFluidSystem;
     }
 };
