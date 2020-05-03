@@ -40,6 +40,8 @@
 } namespace Dune {                                               \
 DUNE_REGISTRY_PUT(tag, name, __VA_ARGS__);  \
 } namespace Dumux {                                              \
+static_assert(true, "Require semicolon to unconfuse editors")
+
 
 namespace Dumux {
 namespace {
