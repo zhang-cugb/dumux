@@ -1,0 +1,51 @@
+[MixedDimension]
+NumCircleSegments = 30
+IntegrationOrder = 2
+
+[Tissue.Grid]
+LowerLeft = 0.0 0.0 0.0
+UpperRight = 150e-6 160e-6 140e-6
+Cells = 5 5 5
+
+[Vessel.Grid]
+File = ../grids/ratbrain.dgf
+MaxElementLength = 40e-6
+
+[Problem]
+EnableGravity = false
+Name = test_microvessel
+
+[Particles]
+EndTime = 1.0
+TimeStepSize = 0.001
+TotalCloudSize = 10000
+Density = 1e13
+VelocityPertubationPercent = 0.3
+
+[SpatialParams]
+PermeabilityTissue = 8.3e-18 # [m^2]
+PorosityTissue = 0.3 # [-]
+
+[VesselWall]
+FiltrationCoefficient = 1e-9
+
+[1.Component]
+Name = Blood
+LiquidKinematicViscosity = 3.0e-6
+LiquidDensity = 1050
+
+[2.Component]
+Name = InterstitialFluid
+LiquidKinematicViscosity = 1.3e-6
+LiquidDensity = 1030
+
+[BoundaryConditions1D]
+PressureInput = 103500
+DeltaPressure = 1000
+
+[LinearSolver]
+MaxIterations = 20000
+
+[Vtk]
+AddProcessRank = false
+AddVelocity = true
