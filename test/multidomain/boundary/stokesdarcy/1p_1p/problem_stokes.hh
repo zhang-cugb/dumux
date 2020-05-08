@@ -160,7 +160,7 @@ public:
         if (verticalFlow_)
         {
             // inflow
-            if(onUpperBoundary_(globalPos))
+            if (onUpperBoundary_(globalPos))
             {
                 values.setDirichlet(Indices::velocityXIdx);
                 values.setDirichlet(Indices::velocityYIdx);
@@ -176,7 +176,7 @@ public:
         else // horizontal flow
         {
             // inlet / outlet
-            if(onLeftBoundary_(globalPos) || onRightBoundary_(globalPos))
+            if (onLeftBoundary_(globalPos) || onRightBoundary_(globalPos))
                 values.setDirichlet(Indices::pressureIdx);
             else // wall
             {
@@ -186,10 +186,16 @@ public:
 
         }
 
-        if(couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
+        if (couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
         {
-            values.setCouplingNeumann(Indices::conti0EqIdx);
-            values.setCouplingNeumann(Indices::momentumYBalanceIdx);
+            if (couplingManager().couplingMode() == CouplingManager::CouplingMode::reconstructPorousMediumPressure)
+            {
+                values.setCouplingNeumann(Indices::conti0EqIdx);
+                values.setCouplingNeumann(Indices::momentumYBalanceIdx);
+            }
+            else // CouplingMode::reconstructFreeFlowNormalStress
+                values.setCouplingDirichlet(Indices::velocityYIdx);
+
             values.setBeaversJoseph(Indices::momentumXBalanceIdx);
         }
 
@@ -202,6 +208,20 @@ public:
     PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
     {
         return initialAtPos(globalPos);
+    }
+
+    using ParentType::dirichlet;
+
+    PrimaryVariables dirichlet(const Element& element, const SubControlVolumeFace& scvf) const
+    {
+        if (couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
+        {
+            PrimaryVariables values(0.0);
+            values[Indices::velocityYIdx] = couplingManager().couplingData().porousMediumInterfaceVelocity(element, scvf);
+            return values;
+        }
+        else
+            return dirichletAtPos(scvf.center());
     }
 
     /*!
@@ -222,7 +242,7 @@ public:
     {
         NumEqVector values(0.0);
 
-        if(couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
+        if (couplingManager().isCoupledEntity(CouplingManager::stokesIdx, scvf))
         {
             values[Indices::conti0EqIdx] = couplingManager().couplingData().massCouplingCondition(element, fvGeometry, elemVolVars, elemFaceVars, scvf);
             values[Indices::momentumYBalanceIdx] = couplingManager().couplingData().momentumCouplingCondition(element, fvGeometry, elemVolVars, elemFaceVars, scvf);
@@ -258,7 +278,7 @@ public:
         else // horizontal flow
         {
             static const Scalar deltaP = getParamFromGroup<Scalar>(this->paramGroup(), "Problem.PressureDifference");
-            if(onLeftBoundary_(globalPos))
+            if (onLeftBoundary_(globalPos))
                 values[Indices::pressureIdx] = deltaP;
         }
 
