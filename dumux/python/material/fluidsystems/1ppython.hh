@@ -49,25 +49,27 @@ inline auto switchSequenceCall([[maybe_unused]] std::size_t i, F&& f)
  * \ingroup Fluidsystems
  * \brief A liquid phase consisting of a single component
  */
-template <class Scalar, class ...ComponentT>
+template <class Scalar, class PythonFluidSystemName,  class FirstComponent, class ...OtherComponents>
 class OnePLiquid
-: public FluidSystems::Base<Scalar, OnePLiquid<Scalar, ComponentT...> >
+: public FluidSystems::Base<Scalar, OnePLiquid<Scalar, PythonFluidSystemName, FirstComponent, OtherComponents...> >
 {
-    using ThisType = OnePLiquid<Scalar, ComponentT...>;
+    using ThisType = OnePLiquid<Scalar, PythonFluidSystemName, FirstComponent, OtherComponents...>;
     using Base = Dumux::FluidSystems::Base<Scalar, ThisType>;
 
-    static_assert(std::conjunction_v<std::integral_constant<bool, ComponentTraits<ComponentT>::hasLiquidState>...>,
-                  "One of the components does not implement a liquid state!");
+    static_assert(ComponentTraits<FirstComponent>::hasLiquidState);
+
+    // static_assert(std::conjunction_v<std::integral_constant<bool, ComponentTraits<ComponentT>::hasLiquidState>...>,
+    //               "One of the components does not implement a liquid state!");
 
 
 public:
     template<std::size_t i>
-    using Component = typename std::tuple_element_t<i, std::tuple<ComponentT...>>;
+    using Component = typename std::tuple_element_t<i, std::tuple<FirstComponent, OtherComponents...>>;
 
     using ParameterCache = NullParameterCache;
 
     static constexpr std::size_t numPhases = 1;  //!< Number of phases in the fluid system
-    static constexpr std::size_t numComponents = sizeof...(ComponentT); //!< Number of components in the fluid system
+    static constexpr std::size_t numComponents = sizeof...(OtherComponents) + 1; //!< Number of components in the fluid system
 
     static constexpr std::size_t phase0Idx = 0; //!< index of the only phase
     static constexpr std::size_t comp0Idx = 0; //!< index of the only component
@@ -136,13 +138,15 @@ public:
      * \brief Returns true if the fluid is assumed to be compressible
      */
     static constexpr bool isCompressible(int phaseIdx = 0)
-    { return std::disjunction_v<std::integral_constant<bool, ComponentT::liquidIsCompressible()>...>; }
+    { return FirstComponent::liquidIsCompressible(); }
+    // { return std::disjunction_v<std::integral_constant<bool, ComponentT::liquidIsCompressible()>...>; }
 
     /*!
      * \brief Returns true if the fluid viscosity is constant
      */
     static constexpr bool viscosityIsConstant(int phaseIdx = 0)
-    { return std::conjunction_v<std::integral_constant<bool, ComponentT::liquidViscosityIsConstant()>...>; }
+    { return FirstComponent::liquidViscosityIsConstant(); }
+    // { return std::conjunction_v<std::integral_constant<bool, ComponentT::liquidViscosityIsConstant()>...>; }
 
     /*!
      * \brief Returns true if the fluid is assumed to be an ideal gas
@@ -232,11 +236,10 @@ public:
      * \brief The density \f$\mathrm{[kg/m^3]}\f$ of the component at a given pressure and temperature.
      */
     template <class FluidState>
-    static Scalar density(const FluidState &fluidState,
+    static Scalar density(const FluidState& fluidState,
                           const int phaseIdx)
     {
-        return density(fluidState.temperature(phaseIdx),
-                       fluidState.pressure(phaseIdx));
+        return pythonFluidSytem_().attr("density")(fluidState, phaseIdx).template cast<Scalar>();
     }
 
     using Base::molarDensity;
@@ -252,8 +255,7 @@ public:
     template <class FluidState>
     static Scalar molarDensity(const FluidState &fluidState, const int phaseIdx)
     {
-        return molarDensity(fluidState.temperature(phaseIdx),
-                            fluidState.pressure(phaseIdx));
+        return pythonFluidSytem_().attr("molarDensity")(fluidState, phaseIdx).template cast<Scalar>();
     }
 
     /*!
@@ -316,8 +318,7 @@ public:
     static Scalar viscosity(const FluidState &fluidState,
                             const int phaseIdx)
     {
-        return viscosity(fluidState.temperature(phaseIdx),
-                         fluidState.pressure(phaseIdx));
+        return pythonFluidSytem_().attr("viscosity")(fluidState, phaseIdx).template cast<Scalar>();
     }
 
     using Base::fugacityCoefficient;
@@ -422,7 +423,7 @@ private:
     static pybind11::object& pythonFluidSytem_()
     {
         static pybind11::scoped_interpreter guard{};
-        static pybind11::object pyFluidSystem = pybind11::module::import("pythonfluidsystem");
+        static pybind11::object pyFluidSystem = pybind11::module::import(PythonFluidSystemName::get());
 
         using FS = Dumux::CompositionalFluidState<Scalar, ThisType>;
         Dumux::Python::Impl::registerFluidState<FS>(pyFluidSystem);
