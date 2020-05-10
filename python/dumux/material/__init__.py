@@ -11,6 +11,8 @@ def Component(Type, Scalar="double"):
         includes += ["dumux/material/components/calcite.hh"]
     elif Type == "H2O":
         includes += ["dumux/material/components/h2o.hh"]
+    elif Type == "N2":
+        includes += ["dumux/material/components/n2.hh"]
 
     generator = SimpleGenerator("Component", "Dumux::Python")
     module = generator.load(includes, typeName, moduleName)
