@@ -188,8 +188,8 @@ catch (Dune::Exception &e)
     std::cerr << "Dune reported error: " << e << " ---> Abort!" << std::endl;
     return 3;
 }
-catch (...)
+catch (const std::exception &exc)
 {
-    std::cerr << "Unknown exception thrown! ---> Abort!" << std::endl;
+    std::cerr << "Unknown exception thrown! " << exc.what() << std::endl;
     return 4;
 }

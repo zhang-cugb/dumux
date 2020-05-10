@@ -40,8 +40,16 @@
 #include <dumux/porousmediumflow/1pnc/model.hh>
 #include <dumux/porousmediumflow/problem.hh>
 
+#if !USEPYTHONFLUIDSYSTEM
 #include <dumux/material/fluidsystems/h2on2.hh>
 #include <dumux/material/fluidsystems/1padapter.hh>
+#else
+#include <dumux/material/components/n2.hh>
+#include <dumux/material/components/simpleh2o.hh>
+#include <dumux/material/components/h2o.hh>
+#include <dumux/material/components/tabulatedcomponent.hh>
+#include <dumux/python/material/fluidsystems/1ppython.hh>
+#endif
 
 #include "../spatialparams.hh"
 
@@ -78,8 +86,22 @@ template<class TypeTag>
 struct FluidSystem<TypeTag, TTag::OnePTwoCTest>
 {
     using Scalar = GetPropType<TypeTag, Properties::Scalar>;
+#if !USEPYTHONFLUIDSYSTEM
     using H2ON2 = FluidSystems::H2ON2<Scalar, FluidSystems::H2ON2DefaultPolicy</*simplified=*/true>>;
     using type = FluidSystems::OnePAdapter<H2ON2, H2ON2::liquidPhaseIdx>;
+#else
+    // using TabulatedH2O = Components::TabulatedComponent<Dumux::Components::H2O<Scalar> >;
+    using H2O = Components::H2O<Scalar>;
+    using SimpleN2 = Dumux::Components::N2<Scalar>;
+
+    struct Name
+    {
+        static constexpr auto get()
+        { return "testfluidsystem1p2c"; }
+    };
+
+    using type = Dumux::FluidSystems::Python::OnePLiquid<Scalar, Name, H2O, SimpleN2>;
+#endif
 };
 
 // Set the spatial parameters
@@ -151,8 +173,10 @@ class OnePTwoCTestProblem : public PorousMediumFlowProblem<TypeTag>
         pressureIdx = Indices::pressureIdx,
 
         // component indices
-        H2OIdx = FluidSystem::compIdx(FluidSystem::MultiPhaseFluidSystem::H2OIdx),
-        N2Idx = FluidSystem::compIdx(FluidSystem::MultiPhaseFluidSystem::N2Idx),
+        H2OIdx = 0,
+        N2Idx = 1,
+        // H2OIdx = FluidSystem::compIdx(FluidSystem::MultiPhaseFluidSystem::H2OIdx),
+        // N2Idx = FluidSystem::compIdx(FluidSystem::MultiPhaseFluidSystem::N2Idx),
 
         // indices of the equations
         contiH2OEqIdx = Indices::conti0EqIdx + H2OIdx,
