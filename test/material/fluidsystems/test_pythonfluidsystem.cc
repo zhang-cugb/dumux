@@ -16,7 +16,7 @@ int main()
         static constexpr auto get()
         { return "pythonfluidsystem"; }
     };
-    using FS = Dumux::FluidSystems::Python::OnePLiquid<double, Name, Dumux::Components::Constant<0, double>, Dumux::Components::H2O<double>>;
+    using FS = Dumux::Python::FluidSystems::OnePLiquid<double, Name, Dumux::Components::Constant<0, double>, Dumux::Components::H2O<double>>;
     std::cout << "density is " << FS::density(300.0, 1e5) << std::endl;
     std::cout << "comp name 0 is " << FS::componentName(0) << std::endl;
     std::cout << "comp name 1 is " << FS::componentName(1) << std::endl;

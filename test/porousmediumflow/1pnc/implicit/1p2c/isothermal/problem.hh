@@ -100,7 +100,7 @@ struct FluidSystem<TypeTag, TTag::OnePTwoCTest>
         { return "testfluidsystem1p2c"; }
     };
 
-    using type = Dumux::FluidSystems::Python::OnePLiquid<Scalar, Name, H2O, SimpleN2>;
+    using type = Dumux::Python::FluidSystems::OnePLiquid<Scalar, Name, H2O, SimpleN2>;
 #endif
 };
 
