@@ -27,7 +27,7 @@
 
 
 
-namespace Dumux::FluidSystems::Python {
+namespace Dumux::Python::FluidSystems {
 
 namespace Detail {
 template <std::size_t size, class F, std::size_t I = 0>
@@ -51,7 +51,7 @@ inline auto switchSequenceCall([[maybe_unused]] std::size_t i, F&& f)
  */
 template <class Scalar, class PythonFluidSystemName,  class FirstComponent, class ...OtherComponents>
 class OnePLiquid
-: public FluidSystems::Base<Scalar, OnePLiquid<Scalar, PythonFluidSystemName, FirstComponent, OtherComponents...> >
+: public Dumux::FluidSystems::Base<Scalar, OnePLiquid<Scalar, PythonFluidSystemName, FirstComponent, OtherComponents...> >
 {
     using ThisType = OnePLiquid<Scalar, PythonFluidSystemName, FirstComponent, OtherComponents...>;
     using Base = Dumux::FluidSystems::Base<Scalar, ThisType>;
