@@ -425,8 +425,12 @@ private:
         static pybind11::scoped_interpreter guard{};
         static pybind11::object pyFluidSystem = pybind11::module::import(PythonFluidSystemName::get());
 
-        using FS = Dumux::CompositionalFluidState<Scalar, ThisType>;
-        Dumux::Python::Impl::registerFluidState<FS>(pyFluidSystem);
+        [[maybe_unused]] static const bool registered = [&]()
+        {
+            using FS = Dumux::CompositionalFluidState<Scalar, ThisType>;
+            Dumux::Python::Impl::registerFluidState<FS>(pyFluidSystem);
+            return true;
+        }();
 
         return pyFluidSystem;
     }
