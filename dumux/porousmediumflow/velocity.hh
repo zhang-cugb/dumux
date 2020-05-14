@@ -26,10 +26,12 @@
 #define DUMUX_POROUSMEDIUMFLOW_VELOCITY_HH
 
 #include <vector>
+#include <type_traits>
 #include <dumux/flux/traits.hh>
 
 #include <dune/common/fvector.hh>
 #include <dune/common/float_cmp.hh>
+#include <dune/common/std/type_traits.hh>
 #include <dune/geometry/referenceelements.hh>
 
 #include <dumux/common/parameters.hh>
@@ -37,6 +39,27 @@
 #include <dumux/discretization/elementsolution.hh>
 
 namespace Dumux {
+
+#ifndef DOXYGEN
+namespace Detail {
+// helper structs and functions detecting if the model is compositional
+
+template <typename T, typename ...Ts>
+using MoleFractionDetector = decltype(std::declval<T>().moleFraction(std::declval<Ts>()...));
+
+template<class T, typename ...Args>
+static constexpr bool hasMoleFraction()
+{ return Dune::Std::is_detected<MoleFractionDetector, T, Args...>::value; }
+
+template <typename T, typename ...Ts>
+using MassFractionDetector = decltype(std::declval<T>().massFraction(std::declval<Ts>()...));
+
+template<class T, typename ...Args>
+static constexpr bool hasMassFraction()
+{ return Dune::Std::is_detected<MassFractionDetector, T, Args...>::value; }
+
+} // end namespace Detail
+#endif // DOXYGEN
 
 /*!
  * \ingroup PorousmediumflowModels
@@ -71,6 +94,9 @@ class PorousMediumFlowVelocity
 
     using Problem = typename GridVolumeVariables::Problem;
     using BoundaryTypes = typename Problem::Traits::BoundaryTypes;
+
+    static constexpr bool modelIsCompositional = Detail::hasMoleFraction<typename GridVolumeVariables::VolumeVariables, Scalar, Scalar>() ||
+                                                 Detail::hasMassFraction<typename GridVolumeVariables::VolumeVariables, Scalar, Scalar>();
 
 public:
     static constexpr int numFluidPhases = VolumeVariables::numFluidPhases();
@@ -310,8 +336,18 @@ public:
                             else if (dim == 1 || geomType.isCube())
                             {
                                 const auto fIdx = scvfIndexInInside[localScvfIdx];
-                                const auto fIdxOpposite = fIdx%2 ? fIdx-1 : fIdx+1;
-                                scvfFluxes[fIdx] = -scvfFluxes[fIdxOpposite];
+
+                                if constexpr (!modelIsCompositional)
+                                {
+                                    // we assume the density at the face equals the one at the cell center
+                                    const auto& insideVolVars = elemVolVars[scvf.insideScvIdx()];
+                                    scvfFluxes[fIdx] += neumannFlux[phaseIdx] / insideVolVars.density(phaseIdx) * scvf.area() * insideVolVars.extrusionFactor();
+                                }
+                                else
+                                {
+                                    const auto fIdxOpposite = fIdx%2 ? fIdx-1 : fIdx+1;
+                                    scvfFluxes[fIdx] = -scvfFluxes[fIdxOpposite];
+                                }
                             }
 
                             // for simplices
