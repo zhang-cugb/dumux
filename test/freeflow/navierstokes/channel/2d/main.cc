@@ -64,9 +64,48 @@ int main(int argc, char** argv) try
     // parse command line arguments and input file
     Parameters::init(argc, argv);
 
-    // try to create a grid (from the given grid file or the input file)
-    GridManager<GetPropType<TypeTag, Properties::Grid>> gridManager;
-    gridManager.init();
+    struct Params
+    {
+        double amplitude = getParam<double>("Grid.Amplitude");
+        double startFormOne = getParam<double>("Grid.StartFormOne");
+        double endFormOne = getParam<double>("Grid.EndFormOne");
+    };
+    Params params;
+
+    using GridView = typename GetPropType<TypeTag, Properties::GridGeometry>::GridView;
+    using Element = typename GridView::template Codim<0>::Entity;
+    using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
+
+    // create a grid
+    auto selector = [&params](const auto& element)
+    {
+        using std::floor;
+        double eps = 1e-12;
+        GlobalPosition globalPos = element.geometry().center();
+
+        const bool inFormOne = (globalPos[0] > params.startFormOne - eps && globalPos[0] < params.endFormOne + eps);
+
+        const double frequency = (params.endFormOne - params.startFormOne);
+        const double argOne = (((globalPos[0]- params.startFormOne)/frequency));
+        const bool isBelowCurveOne = globalPos[1] < ((params.amplitude * (argOne - floor(argOne))) + eps);
+
+        const bool inForm = (inFormOne);
+        const bool isBelowCurve = (isBelowCurveOne);
+
+        if (globalPos[1] < eps)
+            return false;
+        else if (globalPos[1] > ((params.amplitude) - eps))
+            return true;
+        else if (inForm)
+            return isBelowCurve ? false : true;
+        else
+            return true;
+    };
+
+    using HostGrid = Dune::YaspGrid<2>;/*typename GetPropType<TypeTag, Properties::Grid>::HostGrid;*/
+    using SubGrid = Dune::SubGrid<2/*dim*/, HostGrid>;
+    Dumux::GridManager<Dune::SubGrid<2, HostGrid>> gridManager;
+    gridManager.init(selector, "Internal");
 
     ////////////////////////////////////////////////////////////
     // run instationary non-linear problem on this grid
@@ -134,10 +173,6 @@ int main(int argc, char** argv) try
                     SolutionVector,
                     GetPropType<TypeTag, Properties::ModelTraits>,
                     GetPropType<TypeTag, Properties::LocalResidual>> flux(*gridVariables, x);
-    using GridView = typename GetPropType<TypeTag, Properties::GridGeometry>::GridView;
-    using Element = typename GridView::template Codim<0>::Entity;
-
-    using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
 
     const Scalar xMin = gridGeometry->bBoxMin()[0];
     const Scalar xMax = gridGeometry->bBoxMax()[0];

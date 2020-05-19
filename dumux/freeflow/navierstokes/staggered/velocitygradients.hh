@@ -30,6 +30,16 @@
 
 namespace Dumux {
 
+
+template<class SomeType>
+bool scalarCmp(const SomeType& a, const SomeType& b)
+{
+    double eps = 1e-10;
+
+    return a > b - eps
+    && a < b + eps;
+}
+
 /*!
  * \ingroup NavierStokesModel
  * \brief Helper class for calculating the velocity gradients for the Navier-Stokes model using the staggered grid discretization.
@@ -71,6 +81,8 @@ public:
         return ((velocityOpposite - velocitySelf) / scvf.selfToOppositeDistance()) * scvf.directionSign();
     }
 
+
+
     /*!
      * \brief Returns the velocity gradient perpendicular to the orientation of our current scvf.
      *
@@ -107,6 +119,8 @@ public:
         const auto eIdx = scvf.insideScvIdx();
         const auto& lateralScvf = fvGeometry.scvf(eIdx, scvf.pairData(localSubFaceIdx).localLateralFaceIdx);
 
+        bool critialGeometry = (scalarCmp(lateralScvf.center()[0], 4.5) && scalarCmp(lateralScvf.center()[1], 0.1) && scalarCmp(scvf.center()[0], 4.) && scalarCmp(scvf.center()[1],0.15));
+
         // For the velocityGrad_ij derivative, get the velocities at the current (own) scvf
         // and at the parallel one at the neighboring scvf.
         const Scalar innerParallelVelocity = faceVars.velocitySelf();
@@ -114,9 +128,14 @@ public:
         const auto outerParallelVelocity = [&]()
         {
             if (!lateralScvf.boundary())
+            {
                 return faceVars.velocityParallel(localSubFaceIdx, 0);
+            }
             else if (lateralFaceBoundaryTypes->isDirichlet(Indices::velocity(scvf.directionIndex())))
             {
+                if (critialGeometry)
+                    std::cout << "making lateral boundary face" << std::endl;
+
                 // Sample the value of the Dirichlet BC at the center of the staggered lateral face.
                 const auto& lateralBoundaryFacePos = lateralStaggeredFaceCenter_(scvf, localSubFaceIdx);
                 return problem.dirichlet(element, lateralScvf.makeBoundaryFace(lateralBoundaryFacePos))[Indices::velocity(scvf.directionIndex())];

@@ -26,6 +26,7 @@
 #define DUMUX_CHANNEL_TEST_PROBLEM_HH
 
 #include <dune/grid/yaspgrid.hh>
+#include <dune/subgrid/subgrid.hh>
 
 #include <dumux/material/fluidsystems/1pliquid.hh>
 #include <dumux/material/components/simpleh2o.hh>
@@ -63,7 +64,11 @@ struct FluidSystem<TypeTag, TTag::ChannelTest>
 
 // Set the grid type
 template<class TypeTag>
-struct Grid<TypeTag, TTag::ChannelTest> { using type = Dune::YaspGrid<2>; };
+struct Grid<TypeTag, TTag::ChannelTest>
+{
+    using HostGrid = Dune::YaspGrid<2>;
+    using type = Dune::SubGrid<HostGrid::dimension, HostGrid>;
+};
 
 // Set the problem property
 template<class TypeTag>
