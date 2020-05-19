@@ -195,22 +195,25 @@ public:
     // \{
 
     //! Convenience function to evaluate the flux and source terms for the face residual
+    template<class SolutionVector>
     FaceResidualValue evalFluxAndSourceForFace(const Element& element,
                                                const FVElementGeometry& fvGeometry,
                                                const ElementVolumeVariables& elemVolVars,
                                                const ElementFaceVariables& elemFaceVars,
                                                const ElementBoundaryTypes& bcTypes,
                                                const ElementFluxVariablesCache& elemFluxVarsCache,
-                                               const SubControlVolumeFace& scvf) const
+                                               const SubControlVolumeFace& scvf,
+                                               const SolutionVector& curSol) const
     {
         FaceResidualValue residual(0.0);
         asImp().evalSourceForFace(residual, this->problem(), element, fvGeometry, elemVolVars, elemFaceVars, scvf);
-        asImp().evalFluxForFace(residual, this->problem(), element, fvGeometry, elemVolVars, elemFaceVars, bcTypes, elemFluxVarsCache, scvf);
+        asImp().evalFluxForFace(residual, this->problem(), element, fvGeometry, elemVolVars, elemFaceVars, bcTypes, elemFluxVarsCache, scvf, curSol);
 
         return residual;
     }
 
     //! Evaluate the flux terms for a face residual
+    template<class SolutionVector>
     void evalFluxForFace(FaceResidualValue& residual,
                          const Problem& problem,
                          const Element& element,
@@ -219,12 +222,13 @@ public:
                          const ElementFaceVariables& elemFaceVars,
                          const ElementBoundaryTypes& elemBcTypes,
                          const ElementFluxVariablesCache& elemFluxVarsCache,
-                         const SubControlVolumeFace& scvf) const
+                         const SubControlVolumeFace& scvf,
+                         const SolutionVector& curSol) const
     {
         if (!scvf.boundary())
-            residual += asImp_().computeFluxForFace(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache);
+            residual += asImp_().computeFluxForFace(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache, curSol);
         else
-            residual += asImp_().computeBoundaryFluxForFace(problem, element, fvGeometry, scvf, elemVolVars, elemFaceVars, elemBcTypes, elemFluxVarsCache);
+            residual += asImp_().computeBoundaryFluxForFace(problem, element, fvGeometry, scvf, elemVolVars, elemFaceVars, elemBcTypes, elemFluxVarsCache, curSol);
     }
 
     //! Evaluate the source terms for a face residual

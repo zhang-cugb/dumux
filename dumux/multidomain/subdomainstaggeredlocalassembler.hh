@@ -286,7 +286,7 @@ public:
                                                             const ElementVolumeVariables& elemVolVars,
                                                             const ElementFaceVariables& elemFaceVars) const
     {
-        return this->localResidual().evalFluxAndSourceForFace(this->element(), this->fvGeometry(), elemVolVars, elemFaceVars, this->elemBcTypes(), this->elemFluxVarsCache(), scvf);
+        return this->localResidual().evalFluxAndSourceForFace(this->element(), this->fvGeometry(), elemVolVars, elemFaceVars, this->elemBcTypes(), this->elemFluxVarsCache(), scvf, this->curSol());
     }
 
     /*!

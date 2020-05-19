@@ -436,6 +436,23 @@ private:
                     pairData_[numPairParallelIdx].parallelDofs[0] = gridView_.indexSet().subIndex(outerElement, parallelLocalIdx, codimIntersection);
                     pairData_[numPairParallelIdx].parallelCellWidths[0] = setParallelPairCellWidths_(outerElement, parallelAxisIdx);
                 }
+                else if (intersection_.neighbor())
+                {
+                    for (const auto& outerIntersection : intersections(gridView_, intersection_.outside()))
+                    {
+                        if (intersection.indexInInside() == outerIntersection.indexInInside())
+                        {
+                            if (outerIntersection.neighbor())
+                            {
+                                // If the lateral intersection has a neighboring cell, go in and store the parallel information.
+                                const auto& outerElement = outerIntersection.outside();
+                                pairData_[numPairParallelIdx].hasParallelNeighbor.set(0, true);
+                                pairData_[numPairParallelIdx].parallelDofs[0] = gridView_.indexSet().subIndex(outerElement, localOppositeIdx_(parallelLocalIdx), codimIntersection);
+                                pairData_[numPairParallelIdx].parallelCellWidths[0] = setParallelPairCellWidths_(outerElement, parallelAxisIdx);
+                            }
+                        }
+                    }
+                }
 
                 numPairParallelIdx++;
             }
@@ -455,45 +472,80 @@ private:
         const auto parallelLocalIdx = intersection_.indexInInside();
         SmallLocalIndexType numPairParallelIdx = 0;
         std::stack<Element> parallelElementStack;
+        std::stack<SmallLocalIndexType> parallelIndexStack;
         for(const auto& intersection : intersections(gridView_, element_))
         {
             if( facetIsNormal_(intersection.indexInInside(), parallelLocalIdx) )
             {
-                if( intersection.neighbor() )
-                {
-                    auto parallelAxisIdx = directionIndex(intersection);
-                    auto localLateralIntersectionIndex = intersection.indexInInside();
-                    auto e = element_;
+                auto parallelAxisIdx = directionIndex(intersection);
+                auto localLateralIntersectionIndex = intersection.indexInInside();
+                auto previousParallelIdx = parallelLocalIdx;
+                auto e = element_;
 
-                    bool keepStacking =  (parallelElementStack.size() < numParallelFaces);
-                    while(keepStacking)
+                bool keepStacking =  (parallelElementStack.size() < numParallelFaces);
+                while(keepStacking)
+                {
+                    for(const auto& lateralIntersection : intersections(gridView_, e))
                     {
-                        for(const auto& lateralIntersection : intersections(gridView_, e))
+                        if( lateralIntersection.indexInInside() == localLateralIntersectionIndex )
                         {
-                            if( lateralIntersection.indexInInside() == localLateralIntersectionIndex )
+                            if( lateralIntersection.neighbor() )
                             {
-                                if( lateralIntersection.neighbor() )
+                                parallelElementStack.push(lateralIntersection.outside());
+                                e = parallelElementStack.top();
+                                parallelIndexStack.push(previousParallelIdx);
+                                keepStacking = (parallelElementStack.size() < numParallelFaces);
+                            }
+                            else if (previousParallelIdx == parallelLocalIdx)
+                            {
+                                for(const auto& parallelIntersection : intersections(gridView_, e))
                                 {
-                                    parallelElementStack.push(lateralIntersection.outside());
-                                    keepStacking = (parallelElementStack.size() < numParallelFaces);
-                                }
-                                else
-                                {
-                                    keepStacking = false;
+                                    if( parallelIntersection.indexInInside() == intersection_.indexInInside() )
+                                    {
+                                        if (parallelIntersection.neighbor())
+                                        {
+                                            for (const auto& outerLateralIntersection : intersections(gridView_, parallelIntersection.outside()))
+                                            {
+                                                if (localLateralIntersectionIndex == outerLateralIntersection.indexInInside())
+                                                {
+                                                    if (outerLateralIntersection.neighbor())
+                                                    {
+                                                        // If the lateral intersection has a neighboring cell, go in and store the parallel information.
+                                                        parallelElementStack.push(outerLateralIntersection.outside());
+                                                        e = parallelElementStack.top();
+                                                        previousParallelIdx = localOppositeIdx_(parallelLocalIdx);
+                                                        parallelIndexStack.push(previousParallelIdx);
+                                                        keepStacking = (parallelElementStack.size() < numParallelFaces);
+                                                    }
+                                                    else
+                                                    {
+                                                        keepStacking = false;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            keepStacking = false;
+                                        }
+                                    }
                                 }
                             }
+                            else
+                            {
+                                keepStacking = false;
+                            }
                         }
-                        e = parallelElementStack.top();
                     }
+                }
 
-                    while(!parallelElementStack.empty())
-                    {
-                        pairData_[numPairParallelIdx].hasParallelNeighbor.set(parallelElementStack.size()-1, true);
-                        pairData_[numPairParallelIdx].parallelDofs[parallelElementStack.size()-1] = gridView_.indexSet().subIndex(parallelElementStack.top(), parallelLocalIdx, codimIntersection);
-                        pairData_[numPairParallelIdx].parallelCellWidths[parallelElementStack.size()-1] = setParallelPairCellWidths_(parallelElementStack.top(), parallelAxisIdx);
-                        parallelElementStack.pop();
-                    }
-
+                while(!parallelElementStack.empty())
+                {
+                    pairData_[numPairParallelIdx].hasParallelNeighbor.set(parallelElementStack.size()-1, true);
+                    pairData_[numPairParallelIdx].parallelDofs[parallelElementStack.size()-1] = gridView_.indexSet().subIndex(parallelElementStack.top(), parallelIndexStack.top(), codimIntersection);
+                    pairData_[numPairParallelIdx].parallelCellWidths[parallelElementStack.size()-1] = setParallelPairCellWidths_(parallelElementStack.top(), parallelAxisIdx);
+                    parallelElementStack.pop();
+                    parallelIndexStack.pop();
                 }
 
                 numPairParallelIdx++;

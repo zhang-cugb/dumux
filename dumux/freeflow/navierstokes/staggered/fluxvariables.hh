@@ -165,16 +165,18 @@ public:
     /*!
      * \brief Returns the momentum flux over all staggered faces.
      */
+    template <class SolutionVector>
     FacePrimaryVariables computeMomentumFlux(const Problem& problem,
                                              const Element& element,
                                              const SubControlVolumeFace& scvf,
                                              const FVElementGeometry& fvGeometry,
                                              const ElementVolumeVariables& elemVolVars,
                                              const ElementFaceVariables& elemFaceVars,
-                                             const GridFluxVariablesCache& gridFluxVarsCache)
+                                             const GridFluxVariablesCache& gridFluxVarsCache,
+                                             const SolutionVector& curSol)
     {
         return computeFrontalMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, gridFluxVarsCache) +
-               computeLateralMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, gridFluxVarsCache);
+               computeLateralMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, gridFluxVarsCache, curSol);
     }
 
     /*!
@@ -264,13 +266,15 @@ public:
      *                 scvf
      * \endverbatim
      */
+    template<class SolutionVector>
     FacePrimaryVariables computeLateralMomentumFlux(const Problem& problem,
                                                     const Element& element,
                                                     const SubControlVolumeFace& scvf,
                                                     const FVElementGeometry& fvGeometry,
                                                     const ElementVolumeVariables& elemVolVars,
                                                     const ElementFaceVariables& elemFaceVars,
-                                                    const GridFluxVariablesCache& gridFluxVarsCache)
+                                                    const GridFluxVariablesCache& gridFluxVarsCache,
+                                                    const SolutionVector& curSol)
     {
         FacePrimaryVariables lateralFlux(0.0);
         const auto& faceVars = elemFaceVars[scvf];
@@ -387,10 +391,10 @@ public:
             // If none of the above boundary conditions apply for the given sub face, proceed to calculate the tangential momentum flux.
             if (problem.enableInertiaTerms())
                 lateralFlux += computeAdvectivePartOfLateralMomentumFlux_(problem, fvGeometry, element,
-                                                                          scvf, elemVolVars, faceVars,
+                                                                          scvf, elemVolVars, elemFaceVars,
                                                                           gridFluxVarsCache,
                                                                           currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
-                                                                          localSubFaceIdx);
+                                                                          localSubFaceIdx, curSol);
 
             lateralFlux += computeDiffusivePartOfLateralMomentumFlux_(problem, fvGeometry, element,
                                                                       scvf, elemVolVars, faceVars,
@@ -470,17 +474,21 @@ private:
      *                 scvf
      * \endverbatim
      */
+    template<class SolutionVector>
     FacePrimaryVariables computeAdvectivePartOfLateralMomentumFlux_(const Problem& problem,
                                                                     const FVElementGeometry& fvGeometry,
                                                                     const Element& element,
                                                                     const SubControlVolumeFace& scvf,
                                                                     const ElementVolumeVariables& elemVolVars,
-                                                                    const FaceVariables& faceVars,
+                                                                    const ElementFaceVariables& elemFaceVars,
                                                                     const GridFluxVariablesCache& gridFluxVarsCache,
                                                                     const std::optional<BoundaryTypes>& currentScvfBoundaryTypes,
                                                                     const std::optional<BoundaryTypes>& lateralFaceBoundaryTypes,
-                                                                    const int localSubFaceIdx)
+                                                                    const int localSubFaceIdx,
+                                                                    const SolutionVector& curSol)
     {
+        const auto& faceVars = elemFaceVars[scvf];
+
         const auto eIdx = scvf.insideScvIdx();
         const auto& lateralFace = fvGeometry.scvf(eIdx, scvf.pairData(localSubFaceIdx).localLateralFaceIdx);
 
@@ -512,8 +520,8 @@ private:
             }
         }();
 
-        return StaggeredUpwindFluxVariables<TypeTag, upwindSchemeOrder>::computeUpwindedLateralMomentum(problem, fvGeometry, element, scvf, elemVolVars, faceVars,
-                                                                     gridFluxVarsCache, localSubFaceIdx, currentScvfBoundaryTypes, lateralFaceBoundaryTypes)
+        return StaggeredUpwindFluxVariables<TypeTag, upwindSchemeOrder>::computeUpwindedLateralMomentum(problem, fvGeometry, element, scvf, elemVolVars, elemFaceVars,
+                                                                     gridFluxVarsCache, localSubFaceIdx, currentScvfBoundaryTypes, lateralFaceBoundaryTypes, curSol)
                * transportingVelocity * lateralFace.directionSign() * lateralFace.area() * 0.5 * extrusionFactor_(elemVolVars, lateralFace);
     }
 

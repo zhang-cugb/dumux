@@ -127,7 +127,7 @@ public:
 
         const auto outerParallelVelocity = [&]()
         {
-            if (!lateralScvf.boundary())
+            if (scvf.hasParallelNeighbor(localSubFaceIdx, 0))
             {
                 return faceVars.velocityParallel(localSubFaceIdx, 0);
             }

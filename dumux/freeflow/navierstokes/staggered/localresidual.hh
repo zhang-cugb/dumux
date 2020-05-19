@@ -170,16 +170,18 @@ public:
     }
 
     //! Evaluate the momentum flux for the face control volume.
+    template<class SolutionVector>
     FacePrimaryVariables computeFluxForFace(const Problem& problem,
                                             const Element& element,
                                             const SubControlVolumeFace& scvf,
                                             const FVElementGeometry& fvGeometry,
                                             const ElementVolumeVariables& elemVolVars,
                                             const ElementFaceVariables& elemFaceVars,
-                                            const ElementFluxVariablesCache& elemFluxVarsCache) const
+                                            const ElementFluxVariablesCache& elemFluxVarsCache,
+                                            const SolutionVector& curSol) const
     {
         FluxVariables fluxVars;
-        return fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache());
+        return fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache(), curSol);
     }
 
     /*!
@@ -266,6 +268,7 @@ public:
     /*!
      * \brief Evaluate boundary boundary fluxes for a face dof
      */
+    template<class SolutionVector>
     FaceResidual computeBoundaryFluxForFace(const Problem& problem,
                                             const Element& element,
                                             const FVElementGeometry& fvGeometry,
@@ -273,7 +276,8 @@ public:
                                             const ElementVolumeVariables& elemVolVars,
                                             const ElementFaceVariables& elemFaceVars,
                                             const ElementBoundaryTypes& elemBcTypes,
-                                            const ElementFluxVariablesCache& elemFluxVarsCache) const
+                                            const ElementFluxVariablesCache& elemFluxVarsCache,
+                                            const SolutionVector& curSol) const
     {
         FaceResidual result(0.0);
 
@@ -292,13 +296,13 @@ public:
                                          * extrusionFactor * scvf.area();
 
                 // ... and treat the fluxes of the remaining (frontal and lateral) faces of the staggered control volume
-                result += fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache());
+                result += fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache(), curSol);
             }
             else if(bcTypes.isDirichlet(Indices::pressureIdx))
             {
                 // we are at an "fixed pressure" boundary for which the resdiual of the momentum balance needs to be assembled
                 // as if it where inside the domain and not on the boundary (source term has already been acounted for)
-                result = fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache());
+                result = fluxVars.computeMomentumFlux(problem, element, scvf, fvGeometry, elemVolVars, elemFaceVars, elemFluxVarsCache.gridFluxVarsCache(), curSol);
 
                 // incorporate the inflow or outflow contribution
                 result += fluxVars.inflowOutflowBoundaryFlux(problem, element, scvf, elemVolVars, elemFaceVars);

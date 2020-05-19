@@ -106,30 +106,32 @@ public:
      *        Then the corresponding set of momenta are collected and the prescribed
      *        upwinding method is used to calculate the momentum.
      */
+    template<class SolutionVector>
     static FacePrimaryVariables computeUpwindedLateralMomentum(const Problem& problem,
                                                                const FVElementGeometry& fvGeometry,
                                                                const Element& element,
                                                                const SubControlVolumeFace& scvf,
                                                                const ElementVolumeVariables& elemVolVars,
-                                                               const FaceVariables& faceVars,
+                                                               const ElementFaceVariables& elemFaceVars,
                                                                const GridFluxVariablesCache& gridFluxVarsCache,
                                                                const int localSubFaceIdx,
                                                                const std::optional<BoundaryTypes>& currentScvfBoundaryTypes,
-                                                               const std::optional<BoundaryTypes>& lateralFaceBoundaryTypes)
+                                                               const std::optional<BoundaryTypes>& lateralFaceBoundaryTypes,
+                                                               const SolutionVector& curSol)
     {
         // Check whether the own or the neighboring element is upstream.
         const auto eIdx = scvf.insideScvIdx();
         const auto& lateralFace = fvGeometry.scvf(eIdx, scvf.pairData(localSubFaceIdx).localLateralFaceIdx);
         // Get the transporting velocity, located at the scvf perpendicular to the current scvf where the dof
         // of interest is located.
-        const Scalar transportingVelocity = faceVars.velocityLateralInside(localSubFaceIdx);
+        const Scalar transportingVelocity = elemFaceVars[scvf].velocityLateralInside(localSubFaceIdx);
 
         // Check whether the own or the neighboring element is upstream.
         const bool selfIsUpstream = ( lateralFace.directionSign() == sign(transportingVelocity) );
         const bool canHigherOrder = canLateralSecondOrder_(scvf, selfIsUpstream, localSubFaceIdx);
-        const auto parallelUpwindingMomenta = getLateralUpwindingMomenta_(problem, fvGeometry, element, scvf, elemVolVars, faceVars,
+        const auto parallelUpwindingMomenta = getLateralUpwindingMomenta_(problem, fvGeometry, element, scvf, elemVolVars, elemFaceVars,
                                                                           transportingVelocity, localSubFaceIdx, currentScvfBoundaryTypes,
-                                                                          lateralFaceBoundaryTypes, canHigherOrder);
+                                                                          lateralFaceBoundaryTypes, canHigherOrder, curSol);
         return doLateralMomentumUpwinding_(fvGeometry, scvf, parallelUpwindingMomenta, transportingVelocity,
                                            localSubFaceIdx, gridFluxVarsCache, canHigherOrder);
     }
@@ -292,18 +294,22 @@ private:
     /*!
      * \brief Returns an array of momenta needed for higher order or calls a function to return an array for basic upwinding methods.
      */
+    template<class SolutionVector>
     static auto getLateralUpwindingMomenta_(const Problem& problem,
                                             const FVElementGeometry& fvGeometry,
                                             const Element& element,
                                             const SubControlVolumeFace& ownScvf,
                                             const ElementVolumeVariables& elemVolVars,
-                                            const FaceVariables& faceVars,
+                                            const ElementFaceVariables& elemFaceVars,
                                             const Scalar transportingVelocity,
                                             const int localSubFaceIdx,
                                             const std::optional<BoundaryTypes>& currentScvfBoundaryTypes,
                                             const std::optional<BoundaryTypes>& lateralFaceBoundaryTypes,
-                                            [[maybe_unused]] const bool canHigherOrder)
+                                            [[maybe_unused]] const bool canHigherOrder,
+                                            const SolutionVector& curSol)
     {
+        const auto& faceVars = elemFaceVars[ownScvf];
+
         // Check whether the own or the neighboring element is upstream.
         const SubControlVolumeFace& lateralFace = fvGeometry.scvf(ownScvf.insideScvIdx(), ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx);
 
@@ -360,7 +366,7 @@ private:
                     // If there is another parallel neighbor I can assign the "upstream-upstream" velocity, otherwise I retrieve it from the boundary.
                     if (ownScvf.hasParallelNeighbor(localSubFaceIdx, 1))
                         momenta[2] = faceVars.velocityParallel(localSubFaceIdx, 1) * outsideVolVars.density();
-                    else
+                    else if (!lateralFace.boundary())
                     {
                         const Element& elementParallel = fvGeometry.gridGeometry().element(lateralFace.outsideScvIdx());
                         const SubControlVolumeFace& firstParallelScvf = fvGeometry.scvf(lateralFace.outsideScvIdx(), ownScvf.localFaceIdx());
@@ -368,6 +374,40 @@ private:
                         momenta[2] = getParallelVelocityFromOppositeBoundary_(problem, elementParallel, fvGeometry, firstParallelScvf,
                                                                             faceVars, problem.boundaryTypes(elementParallel, firstParallelScvf),
                                                                             localSubFaceIdx) * outsideVolVars.density();
+                    }
+                    else
+                    {
+                        if (!ownScvf.boundary())
+                        {
+                            FVElementGeometry fvOuterGeometry(problem.gridGeometry());
+                            const Element& outsideElement = problem.gridGeometry().element(ownScvf.outsideScvIdx());
+                            fvOuterGeometry.bind(outsideElement);
+
+                            const SubControlVolumeFace& outsideLateralFace = fvOuterGeometry.scvf(ownScvf.outsideScvIdx(), ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx);
+
+                            const Element& elementParallel = problem.gridGeometry().element(outsideLateralFace.outsideScvIdx());
+
+                            const int oppositeLocalFaceIdx = ownScvf.localFaceIdx() % 2 ? ownScvf.localFaceIdx() - 1 : ownScvf.localFaceIdx() + 1;
+
+                            const SubControlVolumeFace& firstParallelScvf = fvOuterGeometry.scvf(outsideLateralFace.outsideScvIdx(), oppositeLocalFaceIdx);
+
+                            const auto& gridFaceVars = elemFaceVars.gridFaceVariables();
+
+                            ElementFaceVariables outerElemFaceVars(gridFaceVars);
+                            outerElemFaceVars.bind(outsideElement, fvOuterGeometry, curSol);
+
+                            const SubControlVolumeFace& outerScvf = fvOuterGeometry.scvf(ownScvf.outsideScvIdx(), oppositeLocalFaceIdx);
+
+                            const FaceVariables& outerFaceVars = outerElemFaceVars[outerScvf];
+
+                            momenta[2] = getParallelVelocityFromOppositeBoundary_(problem, elementParallel, fvOuterGeometry, firstParallelScvf,
+                                                                                outerFaceVars, problem.boundaryTypes(elementParallel, firstParallelScvf),
+                                                                                localSubFaceIdx) * outsideVolVars.density();
+                        }
+                        else
+                        {
+                            momenta[2] = momenta[1];
+                        }
                     }
                 }
                 return momenta;
