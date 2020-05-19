@@ -47,17 +47,22 @@ namespace Dumux {
  * and has a method solve that linearizes (if not already linear), assembles, solves and updates
  * given an initial solution producing a new solution.
  *
- * \tparam Assembler A PDE linearized system assembler
- * \tparam LinearSolver A linear system solver
+ * \tparam AssemblerType A PDE linearized system assembler
+ * \tparam LinearSolverType A linear system solver
  */
-template<class Assembler, class LinearSolver>
+template<class AssemblerType, class LinearSolverType>
 class PDESolver
 {
-    using SolutionVector = typename Assembler::ResidualType;
-    using Scalar = typename Assembler::Scalar;
+    using SolutionVector = typename AssemblerType::ResidualType;
+    using Scalar = typename AssemblerType::Scalar;
     using TimeLoop = TimeLoopBase<Scalar>;
 
 public:
+    //! export the underlying types for assembler and linear solver
+    using Assembler = AssemblerType;
+    using LinearSolver = LinearSolverType;
+
+    //! The constructor
     PDESolver(std::shared_ptr<Assembler> assembler,
               std::shared_ptr<LinearSolver> linearSolver)
     : assembler_(assembler)
@@ -85,7 +90,6 @@ public:
         solve(sol);
     }
 
-protected:
     /*!
      * \brief Access the assembler
      */
@@ -109,6 +113,8 @@ protected:
      */
     LinearSolver& linearSolver()
     { return *linearSolver_; }
+
+protected:
 
     /*!
      * \brief Helper function to assure the MultiTypeBlockMatrix's sub-blocks have the correct sizes.
