@@ -25,9 +25,8 @@
 
 namespace Dumux {
 
-//! forward declaration
-template <class Scalar>
-class MultiStageParams;
+//! forward declarations
+template<class Scalar> class MultiStageParams;
 
 /*!
  * \brief Time stepping with a multi-stage method
@@ -35,91 +34,56 @@ class MultiStageParams;
  *       a stage can only depend on the values of the same stage and stages before
  *       but not future stages (which would require solving larger linear systems)
  */
-class<class LocalResidual, class Solutions>
+template<class LocalResidual>
 class MultiStageLocalResidual
 {
-    MultiStageLocalResidual(const LocalResidual& localResidual,
-                            const MultiStageParams<Scalar>& p,
-                            const Solutions& solutions)
-    : localResidual_(localResidual)
-    , stageParams_(p)
-    , solutions_(solutions)
-    {}
+public:
+    //! export the types underlying the local residual we wrap around here
+    using Variables = typename LocalResidual::Variables;
+    using Residual = typename LocalResidual::Residual;
+    using Scalar = typename LocalResidual::Scalar;
 
-    // TODO: elemVolVars, elemFluxVarsCache and bcTypes possibly depend on time
-    // and have to evaluated at stageParams_.timeAtStage()
-    ElementResidualVector evalResidual(const Element& element,
-                                       const FVElementGeometry& fvGeometry)
+    /*!
+     * \brief The constructor
+     * \param localResiduals The local residuals required for this stage
+     * \param params The parameters of this stage
+     */
+    MultiStageLocalResidual(std::vector<LocalResidual>& localResiduals,
+                            const MultiStageParams<Scalar>& params)
+    : localResiduals_(localResiduals)
+    , stageParams_(params)
     {
-        ElementResidualVector residual(fvGeometry.numScv());
+        if (localResiduals.empty())
+            DUNE_THROW(Dune::InvalidStateException, "At least one residual is required");
+        if (localResiduals.size() != params.size())
+            DUNE_THROW(Dune::InvalidStateException, "Size mismatch between residuals and stage params");
+    }
+
+    Residual eval()
+    {
+        // The residual returned by local residuals may be be a resizable
+        // vector or simply a scalar. Thus, we require a way to construct
+        // an empty residual!? This could be put elsewhere...
+        Residual residual = localResiduals_[0].getEmptyResidual();
 
         for (std::size_t k = 0; k < stageParams_.size(); ++k)
         {
-            auto elemVolVars = localView(gridVariables);
-            elemVolVars.bind(element, fvGeometry, *solutions_[k]);
-
             if (!stageParams_.skipTemporal(k))
-                residual.axpy(stageParams_.temporalWeight(k), evalTemporal(element, fvGeometry, elemVolVars));
+            { residual.axpy(stageParams_.temporalWeight(k), localResiduals_[k].evalStorage()); }
 
             if (!stageParams_.skipSpatial(k))
-            {
-                auto elemFluxVarsCache = localView(gridVariables);
-                elemFluxVarsCache.bind(element, fvGeometry, elemVolVars);
-
-                auto bcTypes = get;
-
-                residual.axpy(stageParams_.spatialWeight(k), evalSpatial(element, fvGeometry, elemVolVars, elemFluxVarsCache, bcTypes));
-            }
+            { residual.axpy(stageParams_.spatialWeight(k), localResiduals_[k].evalFluxesAndSources()); }
         }
 
         return residual;
     }
 
-    ElementResidualVector evalTemporal(const Element& element,
-                                       const FVElementGeometry& fvGeometry,
-                                       const ElementVolumeVariables& elemVolVars) const
-    {
-        // initialize the residual vector for all scvs in this element
-        ElementResidualVector residual(fvGeometry.numScv());
-
-        // evaluate the volume terms (storage + source terms)
-        // forward to the local residual specialized for the discretization methods
-        for (const auto& scv : scvs(fvGeometry))
-        {
-            const auto& volVars = elemVolVars[scv];
-            auto storage = localResidual_.computeStorage(problem, scv, volVars);
-            storage *= scv.volume()*volVars.extrusionFactor();
-            residual[scv.localDofIndex()] += storage;
-        }
-
-        return residual;
-    }
-
-    ElementResidualVector evalSpatial(const Element& element,
-                                      const FVElementGeometry& fvGeometry,
-                                      const ElementVolumeVariables& elemVolVars,
-                                      const ElementFluxVariablesCache& elemFluxVarsCache,
-                                      const ElementBoundaryTypes &bcTypes) const
-    {
-        // initialize the residual vector for all scvs in this element
-        ElementResidualVector residual(fvGeometry.numScv());
-
-        // evaluate the volume terms (storage + source terms)
-        // forward to the local residual specialized for the discretization methods
-        for (const auto& scv : scvs(fvGeometry))
-            localResidual_.evalSource(residual, this->problem(), element, fvGeometry, elemVolVars, scv);
-
-        // forward to the local residual specialized for the discretization methods
-        for (const auto& scvf : scvfs(fvGeometry))
-            localResidual_.evalFlux(residual, this->problem(), element, fvGeometry, elemVolVars, bcTypes, elemFluxVarsCache, scvf);
-
-        return residual;
-    }
+    //! TODO: SHOULD THIS HAVE EVALTEMPORAL() AND EVALSPATIAL() AS WELL?
+    //!       I.E. SHOULD IT BEHAVE LIKE A STANDARD LOCALRESIDUAL?
 
 private:
-    const LocalResidual& localResidual_;
-    const TimeStepping::StageParams<Scalar>& stageParams_;
-    const Solutions& solutions_;
+    std::vector<LocalResidual>& localResiduals_;
+    const MultiStageParams<Scalar>& stageParams_;
 };
 
 } // end namespace Dumux
