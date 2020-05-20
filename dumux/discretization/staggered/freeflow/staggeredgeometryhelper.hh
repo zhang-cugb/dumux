@@ -156,6 +156,17 @@ public:
         intersection_ = intersection;
         fillAxisData_();
         fillPairData_();
+
+        std::cout << std::endl << "element center = " << element_.geometry().center() << ", idx = " << gridView_.indexSet().index(element_) << std::endl;
+        std::cout << ", intersection center = " << intersection_.geometry().center() << ", idx = " << gridView_.indexSet().subIndex(intersection_.inside(), intersection_.indexInInside(), codimIntersection) << std::endl;
+
+        for (unsigned int i = 0; i < numPairs; ++i)
+        {
+            if ( pairData_[i].hasParallelNeighbor[0/*order*/])
+            std::cout << "parallel dofs at " << i << " = " << pairData_[i].parallelDofs[0/*order*/] << std::endl;
+            if ( pairData_[i].hasParallelNeighbor[1/*order*/])
+            std::cout << "second parallel dofs at " << i << " = " << pairData_[i].parallelDofs[1/*order*/] << std::endl;
+        }
     }
 
     /*!

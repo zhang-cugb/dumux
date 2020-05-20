@@ -400,6 +400,8 @@ private:
 
                             const FaceVariables& outerFaceVars = outerElemFaceVars[outerScvf];
 
+                            std::cout << "ownScvf center = " << ownScvf.center() << ", element parallel center = " << elementParallel.geometry().center() << ", firstParallelScvf center = " << firstParallelScvf.center() << std::endl;
+
                             momenta[2] = getParallelVelocityFromOppositeBoundary_(problem, elementParallel, fvOuterGeometry, firstParallelScvf,
                                                                                 outerFaceVars, problem.boundaryTypes(elementParallel, firstParallelScvf),
                                                                                 localSubFaceIdx) * outsideVolVars.density();
@@ -588,6 +590,9 @@ private:
             //     ---------------#
 
             const auto ghostFace = makeParallelGhostFace_(scvf, localSubFaceIdx);
+
+            std::cout << "ghost face center = " << ghostFace.center() << std::endl;
+
             return problem.dirichlet(element, ghostFace)[Indices::velocity(scvf.directionIndex())];
         }
         else
