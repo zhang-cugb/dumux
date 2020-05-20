@@ -38,7 +38,7 @@
 #include <dumux/common/dumuxmessage.hh>
 #include <dumux/common/parameters.hh>
 #include <dumux/common/properties.hh>
-#include <dumux/io/grid/gridmanager_yasp.hh>
+#include <dumux/io/grid/gridmanager_sub.hh>
 #include <dumux/io/staggeredvtkoutputmodule.hh>
 #include <dumux/linear/seqsolverbackend.hh>
 #include <dumux/nonlinear/newtonsolver.hh>
@@ -63,9 +63,48 @@ int main(int argc, char** argv) try
     // parse command line arguments and input file
     Parameters::init(argc, argv);
 
-    // try to create a grid (from the given grid file or the input file)
-    GridManager<GetPropType<TypeTag, Properties::Grid>> gridManager;
-    gridManager.init();
+    using GridView = typename GetPropType<TypeTag, Properties::GridGeometry>::GridView;
+    using Element = typename GridView::template Codim<0>::Entity;
+    using GlobalPosition = typename Element::Geometry::GlobalCoordinate;
+
+    struct Params
+    {
+        double amplitude = getParam<double>("Grid.Amplitude");
+        double startFormOne = getParam<double>("Grid.StartFormOne");
+        double endFormOne = getParam<double>("Grid.EndFormOne");
+        GlobalPosition lowerLeft = getParam<GlobalPosition>("Grid.LowerLeft");
+    };
+    Params params;
+
+    // create a grid
+    auto selector = [&params](const auto& element)
+    {
+        using std::floor;
+        double eps = 1e-12;
+        GlobalPosition globalPos = element.geometry().center();
+
+        const bool inFormOne = (globalPos[0] > params.startFormOne - eps && globalPos[0] < params.endFormOne + eps);
+
+        const double frequency = (params.endFormOne - params.startFormOne);
+        const double argOne = (((globalPos[0]- params.startFormOne)/frequency));
+        const bool isBelowCurveOne = globalPos[1] < ((params.amplitude * (argOne - floor(argOne))) + params.lowerLeft[1] + eps);
+
+        const bool inForm = (inFormOne);
+        const bool isBelowCurve = (isBelowCurveOne);
+
+        if (globalPos[1] < params.lowerLeft[1] + eps)
+            return false;
+        else if (globalPos[1] > (params.lowerLeft[1] + (params.amplitude) - eps))
+            return true;
+        else if (inForm)
+            return isBelowCurve ? false : true;
+        else
+            return true;
+    };
+
+    using HostGrid = Dune::YaspGrid<2, Dune::EquidistantOffsetCoordinates<GetPropType<TypeTag, Properties::Scalar>, 2>>;/*typename GetPropType<TypeTag, Properties::Grid>::HostGrid;*/
+    Dumux::GridManager<Dune::SubGrid<2, HostGrid>> gridManager;
+    gridManager.init(selector, "Internal");
 
     ////////////////////////////////////////////////////////////
     // run instationary non-linear problem on this grid
@@ -108,7 +147,7 @@ int main(int argc, char** argv) try
     auto assembler = std::make_shared<Assembler>(problem, gridGeometry, gridVariables);
 
     // the linear solver
-    using LinearSolver = Dumux::UzawaBiCGSTABBackend<LinearSolverTraits<GridGeometry>>;
+    using LinearSolver = Dumux::UMFPackBackend;
     auto linearSolver = std::make_shared<LinearSolver>();
 
     // the non-linear solver
