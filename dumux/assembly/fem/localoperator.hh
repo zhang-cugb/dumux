@@ -49,19 +49,19 @@ template<class GridVarsLocalView, class Operators>
 class FELocalOperator
 {
     // The variables required for the evaluation of the equation
-    using GridVariables = typename GridVarsLocalView::GridVariables;
-    using IpVariables = typename GridVariables::IntegrationPointVariables;
-    using PrimaryVariables = typename GridVariables::PrimaryVariables;
+    using GridVars = typename GridVarsLocalView::GridVariables;
+    using IpVariables = typename GridVars::IntegrationPointVariables;
+    using PrimaryVariables = typename GridVars::PrimaryVariables;
     using Scalar = typename PrimaryVariables::value_type;
 
     // The grid geometry on which the scheme operates
-    using GridGeometry = typename GridVariables::GridGeometry;
+    using GridGeometry = typename GridVars::GridGeometry;
     using FEElementGeometry = typename GridGeometry::LocalView;
     using GridView = typename GridGeometry::GridView;
     using Element = typename GridView::template Codim<0>::Entity;
 
     // user-input defined in the problem
-    using Problem = typename GridVariables::Problem;
+    using Problem = typename GridVars::Problem;
     using NumEqVector = typename ProblemTraits<Problem>::NumEqVector;
     using BoundaryTypes = typename ProblemTraits<Problem>::BoundaryTypes;
     using ElemBoundaryTypes = FEElementBoundaryTypes<BoundaryTypes>;
@@ -70,6 +70,9 @@ class FELocalOperator
     static constexpr int numEq = NumEqVector::size();
 
 public:
+    //! export the grid variables type this residual requires a local view of
+    using GridVariables = GridVars;
+
     //! the container storing the residual on all dofs of an element
     using ElementResidualVector = Dune::BlockVector<NumEqVector>;
 

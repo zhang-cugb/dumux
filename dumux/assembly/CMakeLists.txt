@@ -1,7 +1,6 @@
 add_subdirectory(fem)
 
 install(FILES
-assembler.hh
 boxlocalassembler.hh
 boxlocalresidual.hh
 cclocalassembler.hh
@@ -19,4 +18,5 @@ numericepsilon.hh
 partialreassembler.hh
 staggeredfvassembler.hh
 staggeredlocalresidual.hh
+stationaryassembler.hh
 DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dumux/assembly)
