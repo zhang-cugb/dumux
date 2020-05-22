@@ -45,7 +45,7 @@ namespace Dumux {
  * \todo TODO: This currently assumes Standard Galerkin type fem schemes as
  *             well as non-composite function space bases. Can we generalize this?
  */
-template<class GridVarsLocalView, class Impl>
+template<class GridVarsLocalView, class Operators>
 class FELocalOperator
 {
     // The variables required for the evaluation of the equation
@@ -73,13 +73,10 @@ public:
     //! the container storing the residual on all dofs of an element
     using ElementResidualVector = Dune::BlockVector<NumEqVector>;
 
-    // The flux term has size dim per equation
-    using FluxTerm = Dune::FieldMatrix<Scalar, numEq, dim>;
-
     /*!
      * \brief The constructor
      * \note The grid geometry/grid variables local views are expected to
-     *       be bound to the given element
+     *       be bound to the same element
      */
     FELocalOperator(const Element& element,
                     const FEElementGeometry& feGeometry,
@@ -87,6 +84,7 @@ public:
     : element_(&element)
     , feGeometry_(&feGeometry)
     , gridVarsLocalView_(&gridVarsLocalView)
+    , operators_(element, feGeometry, gridVarsLocalView)
     {
         elemBcTypes_.update(problem_(), element, feGeometry);
         setDefaultIntegrationOrders_();
@@ -106,10 +104,10 @@ public:
     {
         // evaluate both the volume and the flux terms
         auto volumeTerms = [&] (const auto& ipData, const auto& ipVars)
-        { return this->asImp_().computeSource(ipData, ipVars); };
+        { return operators_.source(ipData, ipVars); };
 
         auto fluxTerms = [&] (const auto& ipData, const auto& ipVars)
-        { return this->asImp_().computeFlux(ipData, ipVars); };
+        { return operators_.flux(ipData, ipVars); };
 
         auto result = integrateTerms_(volumeTerms, fluxTerms);
         result += evalNeumannSegments_();
@@ -123,63 +121,12 @@ public:
     {
         // evaluate both the volume and the flux terms
         auto volumeTerms = [&] (const auto& ipData, const auto& ipVars)
-        { return this->asImp_().computeStorage(ipData, ipVars); };
+        { return operators_.storage(ipData, ipVars); };
 
         return integrateVolumeTerms_(volumeTerms);
     }
 
     // \}
-
-    /*!
-     * \name Model specific interface
-     * \note The following method are the model specific implementations of the
-     *       local operator and should be overloaded by the implementations.
-     */
-    // \{
-
-    /*!
-     * \brief Calculate the storage term of the equation
-     * \param ipData The shape function values/gradients evaluated at the integration point
-     * \param ipVars The primary/secondary variables evaluated at the integration point
-     */
-     template<class IpData>
-     NumEqVector computeStorage(const IpData& ipData,
-                                const IpVariables& ipVars) const
-    { DUNE_THROW(Dune::NotImplemented, "This model does not implement a storage method!"); }
-
-    /*!
-     * \brief Calculate the source term of the equation
-     * \param ipData The shape function values/gradients evaluated at the integration point
-     * \param ipVars The primary/secondary variables evaluated at the integration point
-     */
-     template<class IpData>
-     NumEqVector computeSource(const IpData& ipData,
-                               const IpVariables& ipVars) const
-    {
-        NumEqVector source(0.0);
-
-        // some references for convenience
-        const auto& e = element();
-        const auto& fg = feGeometry();
-        const auto& gv = gridVariablesLocalView();
-
-        // add contributions from volume flux sources
-        source += problem_().source(e, fg, gv, ipData, ipVars);
-
-        // TODO: add contribution from possible point sources
-
-        return source;
-    }
-
-    /*!
-     * \brief Calculate the flux term of the equation
-     * \param ipData The shape function values/gradients evaluated at the integration point
-     * \param ipVars The primary/secondary variables evaluated at the integration point
-     */
-    template<class IpData>
-    FluxTerm computeFlux(const IpData& ipData,
-                         const IpVariables& ipVars) const
-    { DUNE_THROW(Dune::NotImplemented, "This model does not implement a flux method!"); }
 
     /*!
      * \name Interfaces for analytic Jacobian computation
@@ -378,14 +325,6 @@ protected:
         return result;
     }
 
-    //! return reference to implementation
-    Impl& asImp_()
-    { return *static_cast<Impl*>(this); }
-
-    //! return const reference to implementation
-    const Impl& asImp_() const
-    { return *static_cast<const Impl*>(this); }
-
     //! return reference to the underlying problem
     const Problem& problem_() const
     { return gridVariablesLocalView().gridVariables().problem(); }
@@ -406,6 +345,8 @@ private:
     const FEElementGeometry* feGeometry_;        //!< the local view on the finite element grid geometry
     const GridVarsLocalView* gridVarsLocalView_; //!< the local view on the grid variables
     ElemBoundaryTypes elemBcTypes_;              //!< the boundary types defined for all dofs of the element
+
+    Operators operators_; //!< evaluates storage/flux operators of the actual equation at integration points
 
     unsigned int intOrder_;               //!< Integration order used for volume integrals
     unsigned int intOrderBoundary_;       //!< Integration order used for integration of boundary conditions

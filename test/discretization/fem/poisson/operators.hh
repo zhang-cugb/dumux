@@ -20,13 +20,13 @@
  * \file
  * \todo TODO: WHICH GROUP?
  * \ingroup TODO: WHICH GROUP?
- * \copydoc FEPoissonLocalResidual
+ * \copydoc FEPoissonOperators
  */
-#ifndef DUMUX_FEM_POISSON_LOCALRESIDUAL_HH
-#define DUMUX_FEM_POISSON_LOCALRESIDUAL_HH
+#ifndef DUMUX_FEM_POISSON_OPERATORS_HH
+#define DUMUX_FEM_POISSON_OPERATORS_HH
 
 #include <dumux/common/math.hh>
-#include <dumux/assembly/fem/localoperator.hh>
+#include <dumux/assembly/fem/operatorsbase.hh>
 
 namespace Dumux {
 
@@ -34,16 +34,15 @@ namespace Dumux {
  * \file
  * \todo TODO: WHICH GROUP?
  * \ingroup TODO: WHICH GROUP?
- * \brief The local residual class for a poisson problem
- *        using the finite element method
- * \tparam GV The grid variables type
+ * \brief The operators class for a poisson problem
+ *        using the finite element method.
+ * \tparam GridVarsLocalView The type of local view on the grid variables
  */
 template<class GridVarsLocalView>
-class FEPoissonLocalResidual
-: public FELocalOperator< GridVarsLocalView, FEPoissonLocalResidual<GridVarsLocalView> >
+class FEPoissonOperators
+: public FEOperatorsBase< GridVarsLocalView >
 {
-    using ThisType = FEPoissonLocalResidual<GridVarsLocalView>;
-    using ParentType = FELocalOperator<GridVarsLocalView, ThisType>;
+    using ParentType = FEOperatorsBase<GridVarsLocalView>;
     using IpVariables = typename GridVarsLocalView::GridVariables::IntegrationPointVariables;
 
 public:
@@ -60,8 +59,7 @@ public:
      * \param ipVars The primary/secondary variables evaluated at the integration point
      */
     template<class IpData>
-    FluxTerm computeFlux(const IpData& ipData,
-                         const IpVariables& ipVars) const
+    FluxTerm flux(const IpData& ipData, const IpVariables& ipVars) const
     {
         // evaluate gradient in solution
         typename IpData::GlobalPosition gradX(0.0);
@@ -74,10 +72,9 @@ public:
 
         // The flux is tensor*gradX
         FluxTerm result(0.0);
-        if (result.size() != 1)
-            DUNE_THROW(Dune::InvalidStateException, "Flux term size mismatch");
-
+        assert(result.size() == 1);
         result[0] = mv(this->problem_().poissonTensor(), gradX);
+
         return result;
     }
 };

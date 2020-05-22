@@ -46,7 +46,8 @@
 #include <dumux/discretization/fem/fegridvariables.hh>
 
 #include "problem.hh"
-#include "localresidual.hh"
+#include "operators.hh"
+#include <dumux/assembly/fem/localoperator.hh> // TODO: order is like this because of the problem traits issue
 
 
 int main (int argc, char *argv[]) try
@@ -93,9 +94,12 @@ int main (int argc, char *argv[]) try
     x = 0.0;
     gridVariables->init(x);
 
+    // the local operator type
+    using Operators = FEPoissonOperators<typename GridVariables::LocalView>;
+    using LocalOperator = FELocalOperator<typename GridVariables::LocalView, Operators>;
+
     // make the assembler
-    using LocalResidual = FEPoissonLocalResidual<GridVariables>;
-    using Assembler = Assembler<GridVariables, LocalResidual, DiffMethod::numeric>;
+    using Assembler = Assembler<GridVariables, LocalOperator, DiffMethod::numeric>;
     auto assembler = std::make_shared<Assembler>(gridVariables);
 
     // non-linear solver (jacobian is inexact due to numeric differentiation)
