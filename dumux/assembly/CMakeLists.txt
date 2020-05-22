@@ -1,3 +1,5 @@
+add_subdirectory(fem)
+
 install(FILES
 assembler.hh
 boxlocalassembler.hh

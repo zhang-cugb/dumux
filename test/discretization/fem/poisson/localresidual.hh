@@ -26,7 +26,7 @@
 #define DUMUX_FEM_POISSON_LOCALRESIDUAL_HH
 
 #include <dumux/common/math.hh>
-#include <dumux/assembly/felocalresidual.hh>
+#include <dumux/assembly/fem/localoperator.hh>
 
 namespace Dumux {
 
@@ -38,12 +38,13 @@ namespace Dumux {
  *        using the finite element method
  * \tparam GV The grid variables type
  */
-template<class GV>
-class FEPoissonLocalResidual : public FELocalResidual< GV, FEPoissonLocalResidual<GV> >
+template<class GridVarsLocalView>
+class FEPoissonLocalResidual
+: public FELocalOperator< GridVarsLocalView, FEPoissonLocalResidual<GridVarsLocalView> >
 {
-    using ThisType = FEPoissonLocalResidual<GV>;
-    using ParentType = FELocalResidual<GV, ThisType>;
-    using IpVariables = typename GV::IntegrationPointVariables;
+    using ThisType = FEPoissonLocalResidual<GridVarsLocalView>;
+    using ParentType = FELocalOperator<GridVarsLocalView, ThisType>;
+    using IpVariables = typename GridVarsLocalView::GridVariables::IntegrationPointVariables;
 
 public:
     //! export flux term type
@@ -58,20 +59,16 @@ public:
      * \param ipData The shape function values/gradients evaluated at the integration point
      * \param ipVars The primary/secondary variables evaluated at the integration point
      */
-    template<class ElementSolution, class IpData>
-    FluxTerm computeFlux(const ElementSolution& elemSol,
-                         const IpData& ipData,
+    template<class IpData>
+    FluxTerm computeFlux(const IpData& ipData,
                          const IpVariables& ipVars) const
     {
-        if (elemSol.size() != ipData.size())
-            DUNE_THROW(Dune::InvalidStateException, "Element solution size mismatch");
-
         // evaluate gradient in solution
         typename IpData::GlobalPosition gradX(0.0);
         for (unsigned int i = 0; i < ipData.size(); ++i)
         {
             auto tmp = ipData.gradN(i);
-            tmp *= elemSol[i];
+            tmp *= this->gridVariablesLocalView().elemSol()[i];
             gradX += tmp;
         }
 
