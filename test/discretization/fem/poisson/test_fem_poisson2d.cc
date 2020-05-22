@@ -36,7 +36,7 @@
 #include <dune/functions/gridfunctions/analyticgridviewfunction.hh>
 
 #include <dumux/io/grid/gridmanager.hh>
-#include <dumux/assembly/assembler.hh>
+#include <dumux/assembly/stationaryassembler.hh>
 #include <dumux/assembly/diffmethod.hh>
 
 #include <dumux/linear/seqsolverbackend.hh>
@@ -99,8 +99,8 @@ int main (int argc, char *argv[]) try
     using LocalOperator = FELocalOperator<typename GridVariables::LocalView, Operators>;
 
     // make the assembler
-    using Assembler = Assembler<GridVariables, LocalOperator, DiffMethod::numeric>;
-    auto assembler = std::make_shared<Assembler>(gridVariables);
+    using Assembler = StationaryAssembler<LocalOperator, DiffMethod::numeric>;
+    auto assembler = std::make_shared<Assembler>(gridGeometry);
 
     // non-linear solver (jacobian is inexact due to numeric differentiation)
     using LinearSolver = ILU0BiCGSTABBackend;
@@ -109,7 +109,7 @@ int main (int argc, char *argv[]) try
     auto newtonSolver = std::make_shared<NewtonSolver>(assembler, linearSolver);
 
     // solve the system
-    newtonSolver->solve(x);
+    newtonSolver->solve(x, *gridVariables);
 
     // Write out the numerical and the exact solutions
     auto evalExact = [problem] (const auto& pos) { return problem->exact(pos); };
