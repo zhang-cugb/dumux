@@ -87,21 +87,10 @@ public:
      */
     void bind(const Element& element)
     {
-        const auto& problem = assembler().problem();
-        const auto& gridGeometry = problem.gridGeometry();
-
         feGeometry_.bind(element);
         gridVarsLocalView_.bind(element, feGeometry_);
-        curElemSol_ = elementSolution(element, gridVarsLocalView().gridVariables().solutionVector(), gridGeometry);
 
-        if (assembler().isStationaryProblem())
-            localResidual_ = std::make_unique<LocalResidual>(element, feGeometry_, gridVarsLocalView_);
-        else
-        {
-            localResidual_ = std::make_unique<LocalResidual>(element, feGeometry_, gridVarsLocalView_, &assembler().timeLoop());
-            prevElemSol_ = elementSolution(element, assembler().prevSol(), gridGeometry);
-        }
-
+        localResidual_ = std::make_unique<LocalResidual>(element, feGeometry_, gridVarsLocalView_);
         elementIsGhost_ = element.partitionType() == Dune::GhostEntity;
     }
 
@@ -122,8 +111,7 @@ public:
             return residual;
         }
 
-        return assembler().isStationaryProblem() ? localResidual_->eval(curElemSol_)
-                                                 : localResidual_->eval(prevElemSol_, curElemSol_, isImplicit());
+        return localResidual_->evalFluxesAndSources();
     }
 
     /*!
@@ -184,7 +172,8 @@ public:
                                    const auto eqIdx,
                                    const auto pvIdx)
         {
-            res[dofIdx][eqIdx] = curElemSol_[localDofIdx][pvIdx] - dirichletValues[pvIdx];
+            const auto& elemSol = gridVarsLocalView().elemSol();
+            res[dofIdx][eqIdx] = elemSol[localDofIdx][pvIdx] - dirichletValues[pvIdx];
 
             auto& row = jac[dofIdx];
             for (auto col = row.begin(); col != row.end(); ++col)
@@ -239,7 +228,8 @@ public:
                                    const auto eqIdx,
                                    const auto pvIdx)
         {
-            res[dofIdx][eqIdx] = curElemSol_[localDofIdx][pvIdx] - dirichletValues[pvIdx];
+            const auto& elemSol = gridVarsLocalView().elemSol();
+            res[dofIdx][eqIdx] = elemSol[localDofIdx][pvIdx] - dirichletValues[pvIdx];
         };
 
         enforceDirichletConstraints_(applyDirichlet);
@@ -407,7 +397,8 @@ protected:
         const auto origResiduals = evalLocalResidual();
 
         // create copy of element solution to undo deflections later
-        const auto origElemSol = curElemSol_;
+        auto& elemSol = gridVarsLocalView().elemSol();
+        const auto origElemSol = elemSol;
 
         ///////////////////////////////////////tsLocalVi///////////////////////////////////////////////////////
         // Calculate derivatives of the residual of all dofs in element with respect to themselves. //
@@ -428,15 +419,15 @@ protected:
                 auto evalResiduals = [&](Scalar priVar)
                 {
                     // update the element solution and compute element residual
-                    curElemSol_[localI][pvIdx] = priVar;
+                    elemSol[localI][pvIdx] = priVar;
                     return this->evalLocalResidual();
                 };
 
                 // derive the residuals numerically
                 static const NumericEpsilon<Scalar, numEq> eps_{assembler_.problem().paramGroup()};
                 static const int numDiffMethod = getParamFromGroup<int>(assembler_.problem().paramGroup(), "Assembly.NumericDifferenceMethod");
-                NumericDifferentiation::partialDerivative(evalResiduals, curElemSol_[localI][pvIdx], partialDerivs,
-                                                          origResiduals, eps_(curElemSol_[localI][pvIdx], pvIdx),
+                NumericDifferentiation::partialDerivative(evalResiduals, elemSol[localI][pvIdx], partialDerivs,
+                                                          origResiduals, eps_(elemSol[localI][pvIdx], pvIdx),
                                                           numDiffMethod);
 
                 // update the global stiffness matrix with the current partial derivatives
@@ -458,7 +449,7 @@ protected:
                 }
 
                 // restore the original element solution
-                curElemSol_[localI][pvIdx] = origElemSol[localI][pvIdx];
+                elemSol[localI][pvIdx] = origElemSol[localI][pvIdx];
 
                 // TODO additional dof dependencies
             }
@@ -472,9 +463,6 @@ private:
     FEElementGeometry feGeometry_;        //!< element-local view on the grid geometry
     GridVarsLocalView gridVarsLocalView_; //!< element-local view on the grid variables
     bool elementIsGhost_;          //!< whether the element's partitionType is ghost
-
-    ElementSolution curElemSol_;   //!< element solution based on the solution of the current time step
-    ElementSolution prevElemSol_;  //!< element solution based on the solution of the last time step
 
     std::unique_ptr<LocalResidual> localResidual_; //!< the local residual evaluating the equations per element
     DiffMethod diffMethod_{DiffMethod::numeric}; //!< the differentiation method (numeric, analytic, ...)
