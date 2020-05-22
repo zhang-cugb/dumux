@@ -20,35 +20,40 @@
  * \file
  * \ingroup Assembly
  * \brief An assembler for Jacobian and residual contribution
- *        per element (finite element method).
+ *        per element (finite element method) in the context of
+ *        stationary problems.
  */
-#ifndef DUMUX_FE_LOCAL_ASSEMBLER_HH
-#define DUMUX_FE_LOCAL_ASSEMBLER_HH
+#ifndef DUMUX_FE_STATIONARY_LOCAL_ASSEMBLER_HH
+#define DUMUX_FE_STATIONARY_LOCAL_ASSEMBLER_HH
 
 #include <cassert>
 #include <memory>
 
 #include <dune/grid/common/gridenums.hh>
+
 #include <dumux/discretization/fem/elementsolution.hh>
-#include "diffmethod.hh"
+#include <dumux/assembly/diffmethod.hh>
+#include <dumux/assembly/numericepsilon.hh>
+
 
 namespace Dumux {
 
 /*!
  * \ingroup Assembly
- * \brief A base class for all fem assemblers
- * \tparam TypeTag The TypeTag
- * \tparam Assembler The assembler type
- * \tparam Implementation The local assembler implementation
- * \tparam useImplicitAssembly Specifies whether the time discretization is implicit or not not (i.e. explicit)
+ * \brief An assembler for Jacobian and residual contribution
+ *        per element (finite element method) in the context of
+ *        stationary problems.
+ * \tparam Assembler The grid-wide assembler type
  * \todo TODO: This assumes Standard-Galerkin discretizations and non-composite function spaces.
  *             Could this be generalized to other spaces and Petrov-Galerkin?
  */
 template<class Assembler>
-class FELocalAssembler
+class FEStationaryLocalAssembler
 {
+    using SolutionVector = typename Assembler::SolutionVector;
     using GridVariables = typename Assembler::GridVariables;
     using GridGeometry = typename GridVariables::GridGeometry;
+    using Problem = typename GridVariables::Problem;
 
     using FEElementGeometry = typename GridGeometry::LocalView;
     using GridVarsLocalView = typename GridVariables::LocalView;
@@ -62,36 +67,34 @@ class FELocalAssembler
     static constexpr int numEq = PrimaryVariables::size();
 
 public:
-    using LocalResidual = typename Assembler::LocalResidual;
-    using ElementResidualVector = typename LocalResidual::ElementResidualVector;
+    using LocalOperator = typename Assembler::LocalOperator;
+    using ElementResidualVector = typename LocalOperator::ElementResidualVector;
 
     using JacobianMatrix = typename Assembler::JacobianMatrix;
-    using ResidualType = typename Assembler::ResidualType;
+    using ResidualVector = typename Assembler::ResidualVector;
 
     /*!
      * \brief Construct the local assembler from an assembler.
      */
-    explicit FELocalAssembler(const Assembler& assembler)
+    explicit FEStationaryLocalAssembler(const Assembler& assembler)
     : assembler_(assembler)
-    , feGeometry_(localView(assembler.gridGeometry()))
-    , gridVarsLocalView_(localView(assembler.gridVariables()))
     {}
-
-    //! \todo TODO Remove this function and substitute by proper time integration framework
-    static constexpr bool isImplicit() { return true; }
 
     /*!
      * \brief Bind this local assembler to an element of the grid.
      * \param element The grid element
-     * \param sol A solution vector with the primary variables at the dofs of the grid
+     * \param gridVars An instance of the grid variables
      */
-    void bind(const Element& element)
+    void bind(const Element& element,
+              const GridVariables& gridVars)
     {
-        feGeometry_.bind(element);
-        gridVarsLocalView_.bind(element, feGeometry_);
-
-        localResidual_ = std::make_unique<LocalResidual>(element, feGeometry_, gridVarsLocalView_);
         elementIsGhost_ = element.partitionType() == Dune::GhostEntity;
+        feGeometry_ = std::make_unique<FEElementGeometry>(gridVars.gridGeometry());
+        gridVarsLocalView_ = std::make_unique<GridVarsLocalView>(gridVars);
+
+        feGeometry_->bind(element);
+        gridVarsLocalView_->bind(element, *feGeometry_);
+        localOperator_ = std::make_unique<LocalOperator>(element, *feGeometry_, *gridVarsLocalView_);
     }
 
     /*!
@@ -99,50 +102,48 @@ public:
      */
     ElementResidualVector evalLocalResidual() const
     {
-        // error handling for incompatible combination
-        if (!isImplicit() && assembler().isStationaryProblem())
-            DUNE_THROW(Dune::InvalidStateException, "Using explicit jacobian assembler with stationary local residual");
-
         // residual of ghost elements is zero
         if (elementIsGhost_)
         {
-            ElementResidualVector residual(feGeometry_.feBasisLocalView().size());
+            ElementResidualVector residual(feGeometry().feBasisLocalView().size());
             residual = 0.0;
             return residual;
         }
 
-        return localResidual_->evalFluxesAndSources();
+        // stationary assembly -> only assemble fluxes and sources
+        return localOperator_->evalFluxesAndSources();
     }
 
     /*!
-     * \brief Computes the derivatives with respect to the given element and adds them
-     *        to the global matrix. The element residual is written into the right hand side.
+     * \brief Computes the derivatives with respect to the given element and adds
+     *        them to the global matrix. The element residual is written into the
+     *        right hand side.
      */
     template <class PartialReassembler = DefaultPartialReassembler>
     void assembleJacobianAndResidual(JacobianMatrix& jac,
-                                     ResidualType& res,
+                                     ResidualVector& res,
                                      const PartialReassembler* partialReassembler = nullptr)
     {
-        const auto& element = localResidual_->element();
-        const auto eIdxGlobal = this->assembler().gridGeometry().elementMapper().index(element);
+        const auto& element = localOperator_->element();
+        const auto eIdxGlobal = feGeometry().gridGeometry().elementMapper().index(element);
 
         if (partialReassembler && partialReassembler->elementColor(eIdxGlobal) == EntityColor::green)
         {
             const auto residual = evalLocalResidual();
-            const auto& localView = localResidual_->feGeometry().feBasisLocalView();
+            const auto& localView = feGeometry().feBasisLocalView();
             for (unsigned int i = 0; i < localView.size(); ++i)
                 res[localView.index(i)] += residual[i];
         }
         else if (!elementIsGhost_)
         {
             const auto residual = assembleJacobianAndResidual_(jac, partialReassembler);
-            const auto& localView = localResidual_->feGeometry().feBasisLocalView();
+            const auto& localView = feGeometry().feBasisLocalView();
             for (unsigned int i = 0; i < localView.size(); ++i)
                 res[localView.index(i)] += residual[i];
         }
         else
         {
-            const auto& localView = localResidual_->feGeometry().feBasisLocalView();
+            const auto& localView = localOperator_->feGeometry().feBasisLocalView();
             const auto& finiteElement = localView.tree().finiteElement();
             const auto numLocalDofs = finiteElement.localBasis().size();
 
@@ -214,11 +215,11 @@ public:
     /*!
      * \brief Assemble the residual only
      */
-    void assembleResidual(ResidualType& res)
+    void assembleResidual(ResidualVector& res)
     {
         const auto residual = evalLocalResidual();
 
-        const auto& localView = feGeometry_.feBasisLocalView();
+        const auto& localView = feGeometry().feBasisLocalView();
         for (unsigned int i = 0; i < localView.size(); ++i)
             res[localView.index(i)] += residual[i];
 
@@ -241,23 +242,23 @@ public:
 
     //! The finite volume geometry
     FEElementGeometry& feGeometry()
-    { return feGeometry_; }
+    { return *feGeometry_; }
 
     //! The finite volume geometry
     const FEElementGeometry& feGeometry() const
-    { return feGeometry_; }
+    { return *feGeometry_; }
 
     //! The local view on the grid variables
     GridVarsLocalView& gridVarsLocalView()
-    { return gridVarsLocalView_; }
+    { return *gridVarsLocalView_; }
 
     //! The local view on the grid variables
     const GridVarsLocalView& gridVarsLocalView() const
-    { return gridVarsLocalView_; }
+    { return *gridVarsLocalView_; }
 
     //! Return the underlying local residual
-    const LocalResidual& localResidual() const
-    { return *localResidual_; }
+    const LocalOperator& localOperator() const
+    { return *localOperator_; }
 
 protected:
     //! Enforce Dirichlet constraints
@@ -276,12 +277,12 @@ protected:
     template< typename ApplyDirichletFunctionType >
     void evalDirichletBoundaries_(ApplyDirichletFunctionType applyDirichlet)
     {
-        const auto& elemBcTypes = localResidual_->elemBcTypes();
+        const auto& elemBcTypes = localOperator_->elemBcTypes();
         // enforce Dirichlet boundaries by overwriting partial derivatives with 1 or 0
         // and set the residual to (privar - dirichletvalue)
         if (elemBcTypes.hasDirichlet())
         {
-            const auto& localView = feGeometry_.feBasisLocalView();
+            const auto& localView = feGeometry().feBasisLocalView();
             const auto& finiteElement = localView.tree().finiteElement();
 
             for (unsigned int localDofIdx = 0; localDofIdx < localView.size(); localDofIdx++)
@@ -318,7 +319,7 @@ protected:
     {
         static constexpr int dim = Element::Geometry::mydimension;
 
-        const auto& element = localResidual_->element();
+        const auto& element = localOperator_->element();
         if (codim == 0)
             return getDirichletValues_(element.template subEntity<0>(subEntityIdx));
         if (codim == 1)
@@ -340,7 +341,7 @@ protected:
      */
     template<class SubEntity>
     PrimaryVariables getDirichletValues_(const SubEntity& subEntity)
-    { return assembler().problem().dirichlet(localResidual_->element(), subEntity); }
+    { return problem_().dirichlet(localOperator_->element(), subEntity); }
 
     /*!
      * \brief Returns true if a sub entity of an element is a ghost entity
@@ -349,7 +350,7 @@ protected:
     {
         static constexpr int dim = Element::Geometry::mydimension;
 
-        const auto& element = localResidual_->element();
+        const auto& element = localOperator_->element();
         if (codim == 0)
             return isGhostEntity_(element.template subEntity<0>(subEntityIdx));
         if (codim == 1)
@@ -382,6 +383,8 @@ protected:
     ElementResidualVector assembleJacobianAndResidual_(JacobianMatrix& A,
                                                        const PartialReassembler* partialReassembler = nullptr)
     {
+        // TODO: implement this and get rid of if statement
+        //       -> first, issue with how diff method enters has to be adressed (see private variable)
         if (diffMethod_ != DiffMethod::numeric)
             DUNE_THROW(Dune::NotImplemented, "analytic differentiation for FEM");
 
@@ -424,8 +427,8 @@ protected:
                 };
 
                 // derive the residuals numerically
-                static const NumericEpsilon<Scalar, numEq> eps_{assembler_.problem().paramGroup()};
-                static const int numDiffMethod = getParamFromGroup<int>(assembler_.problem().paramGroup(), "Assembly.NumericDifferenceMethod");
+                static const NumericEpsilon<Scalar, numEq> eps_{problem_().paramGroup()};
+                static const int numDiffMethod = getParamFromGroup<int>(problem_().paramGroup(), "Assembly.NumericDifferenceMethod");
                 NumericDifferentiation::partialDerivative(evalResiduals, elemSol[localI][pvIdx], partialDerivs,
                                                           origResiduals, eps_(elemSol[localI][pvIdx], pvIdx),
                                                           numDiffMethod);
@@ -458,13 +461,22 @@ protected:
         return origResiduals;
     }
 
+protected:
+    //! Return a reference to the underlying problem
+    const Problem& problem_() const
+    { return gridVarsLocalView().gridVariables().problem(); }
+
 private:
     const Assembler& assembler_;          //!< reference to assembler instance
-    FEElementGeometry feGeometry_;        //!< element-local view on the grid geometry
-    GridVarsLocalView gridVarsLocalView_; //!< element-local view on the grid variables
-    bool elementIsGhost_;          //!< whether the element's partitionType is ghost
 
-    std::unique_ptr<LocalResidual> localResidual_; //!< the local residual evaluating the equations per element
+    //! element-local views on the geometry and variables
+    //! these define the state of this class after calling bind()
+    std::unique_ptr<FEElementGeometry> feGeometry_;
+    std::unique_ptr<GridVarsLocalView> gridVarsLocalView_;
+
+    bool elementIsGhost_; //!< whether the element's partitionType is ghost
+    std::unique_ptr<LocalOperator> localOperator_; //!< operator evaluating the terms of the equations per element
+
     DiffMethod diffMethod_{DiffMethod::numeric}; //!< the differentiation method (numeric, analytic, ...)
     // TODO: how should diff method come in? Upon construction or via setter? Or as argument to assemble() ?
 };
