@@ -57,6 +57,21 @@ private:
     MockScalarVariables res_;
 };
 
+class MockVariables
+{
+public:
+    void setSolutionPointer(const MockScalarResidual& sol)
+    {
+        sol_ = &sol;
+    }
+
+    const MockScalarResidual& sol() const
+    { return *sol_; }
+
+private:
+    const MockScalarResidual* sol_;
+};
+
 class MockScalarAssembler
 {
 public:
@@ -66,7 +81,7 @@ public:
 
     // we don't need additional variables other than the solution
     using SolutionVector = ResidualType;
-    using Variables = SolutionVector;
+    using Variables = MockVariables;
 
     void setLinearSystem() {}
 
@@ -78,29 +93,31 @@ public:
 
     void assembleResidual(const Variables& vars)
     {
-        res_[0][0] = vars[0][0]*vars[0][0] - 5.0;
+        res_[0][0] = vars.sol()[0][0]*vars.sol()[0][0] - 5.0;
     }
 
     void assembleJacobianAndResidual (const Variables& vars)
     {
         assembleResidual(vars);
-        jac_ = 2.0*vars[0][0];
+        jac_ = 2.0*vars.sol()[0][0];
     }
 
     JacobianMatrix& jacobian() { return jac_; }
 
     ResidualType& residual() { return res_; }
 
-    double residualNorm(const ResidualType& sol)
+    double residualNorm(const Variables& vars)
     {
-        assembleResidual(sol);
+        assembleResidual(vars);
         return res_[0][0];
     }
 
     // In this test, update does nothing, as our variables object
     // is just a reference to the solution
     void update(Variables& vars, const SolutionVector& x)
-    {}
+    {
+        vars.setSolutionPointer(x);
+    }
 
 private:
     JacobianMatrix jac_;
@@ -145,7 +162,8 @@ int main(int argc, char* argv[]) try
 
     double initialGuess = 0.1;
     MockScalarResidual x(initialGuess);
-    auto& variables = x;
+    MockVariables variables;
+    variables.setSolutionPointer(x);
 
     std::cout << "Solving: x^2 - 5 = 0" << std::endl;
     solver->solve(x, variables);
