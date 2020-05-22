@@ -28,6 +28,7 @@
 #include <cassert>
 #include <dumux/discretization/localview.hh>
 
+#include "elementsolution.hh"
 #include "ipvariablesbase.hh"
 
 namespace Dumux {
@@ -46,6 +47,9 @@ class FEGridVariablesLocalView
 
     using GridView = typename GridGeometry::GridView;
     using Element = typename GridView::template Codim<0>::Entity;
+
+    using PrimaryVariables = typename GV::PrimaryVariables;
+    using ElementSolution = FEElementSolution<FEElementGeometry, PrimaryVariables>;
 
 public:
     using GridVariables = GV;
@@ -67,7 +71,27 @@ public:
      */
     void bind(const Element& element,
               const FEElementGeometry& feGeometry)
-    {}
+    {
+        const auto& x = gridVariables().solutionVector();
+        const auto& gg = gridVariables().gridGeometry();
+        elemSol_ = elementSolution(element, x, gg);
+    }
+
+    /*!
+     * \brief Return the element solution, i.e. the element-local
+     *        view on the solution vector.
+     */
+    const ElementSolution& elemSol() const
+    { return elemSol_; }
+
+    /*!
+     * \todo TODO: This is currently required such that the local assembler
+     *             can deflect the solution in here in order to compute numerical
+     *             derivatives. This means that the state of this local object does
+     *             not correspond to the global object!?
+     */
+    ElementSolution& elemSol()
+    { return elemSol_; }
 
     /*!
      * \brief Return a reference to the grid variables.
@@ -77,6 +101,7 @@ public:
 
 private:
     const GridVariables* gridVariables_;
+    ElementSolution elemSol_;
 };
 
 //! TODO: have these defined at a central place
