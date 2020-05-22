@@ -64,6 +64,10 @@ public:
     using Scalar = double;
     using JacobianMatrix = double;
 
+    // we don't need additional variables other than the solution
+    using SolutionVector = ResidualType;
+    using Variables = SolutionVector;
+
     void setLinearSystem() {}
 
     bool isStationaryProblem() { return false; }
@@ -72,15 +76,15 @@ public:
 
     void resetTimeStep(const ResidualType& sol) {}
 
-    void assembleResidual(const ResidualType& sol)
+    void assembleResidual(const Variables& vars)
     {
-        res_[0][0] = sol[0][0]*sol[0][0] - 5.0;
+        res_[0][0] = vars[0][0]*vars[0][0] - 5.0;
     }
 
-    void assembleJacobianAndResidual (const ResidualType& sol)
+    void assembleJacobianAndResidual (const Variables& vars)
     {
-        assembleResidual(sol);
-        jac_ = 2.0*sol[0][0];
+        assembleResidual(vars);
+        jac_ = 2.0*vars[0][0];
     }
 
     JacobianMatrix& jacobian() { return jac_; }
@@ -93,7 +97,10 @@ public:
         return res_[0][0];
     }
 
-    void updateGridVariables(const ResidualType& sol) {}
+    // In this test, update does nothing, as our variables object
+    // is just a reference to the solution
+    void update(Variables& vars, const SolutionVector& x)
+    {}
 
 private:
     JacobianMatrix jac_;
@@ -138,9 +145,10 @@ int main(int argc, char* argv[]) try
 
     double initialGuess = 0.1;
     MockScalarResidual x(initialGuess);
+    auto& variables = x;
 
     std::cout << "Solving: x^2 - 5 = 0" << std::endl;
-    solver->solve(x);
+    solver->solve(x, variables);
     std::cout << "Solution: " << std::setprecision(15) << x[0][0]
               << ", exact: " << std::sqrt(5.0)
               << ", error: " << std::abs(x[0][0]-std::sqrt(5.0))/std::sqrt(5.0)*100 << "%" << std::endl;
