@@ -163,23 +163,22 @@ public:
     // existing assembler interfaces
     void setLinearSystem() {}
 
-    // TODO: DO WE WANT TO REMOVE THE SOLUTION FROM INTERFACE??
-    void assembleResidual(const ResidualType& sol)
+    void assembleResidual(const Variables& vars)
     {
         // wrap multi-stage residual around local residuals
         std::vector<LocalResidual> localResiduals;
         localResiduals.reserve(stageParams_->size());
-        for (std::size_t i = 0; i < stageParams_->size(); ++i)
-            localResiduals.emplace_back(*stageVariables_[i]);
+        for (std::size_t i = 0; i < stageParams_->size()-1; ++i)
+            localResiduals.emplace_back(stageVariables_[i]);
+        localResiduals.emplace_back(vars);
 
         using MSLocalResidual = MultiStageLocalResidual<LocalResidual>;
         res_[0][0] = MSLocalResidual(localResiduals, *stageParams_).eval();
     }
 
-    // TODO: REMOVE THE SOLUTION FROM INTERFACE!?
-    void assembleJacobianAndResidual(const ResidualType& sol)
+    void assembleJacobianAndResidual(const Variables& vars)
     {
-        assembleResidual(sol);
+        assembleResidual(vars);
 
         // For this problem, the derivative is always 1.0
         jac_ = 1.0;
@@ -187,34 +186,30 @@ public:
         // numerical differentiation also works (although
         // the code is a bit cumbersome)...
         //
-        // make a copy of the undeflected variables
-        // const auto origGridVariables = *stageVariables_.back();
+        // // make a copy of the variables to allow deflection
+        // auto nonConstVars = vars;
         // const auto origRes = res_;
-        // const auto origTime = origGridVariables.time();
-        // const auto origSol = origGridVariables.curSol();
         //
         // // lambda to evaluate the local residual
         // // as function of a primary variable
-        // auto& curVariables = *stageVariables_.back();
         // auto evalRes = [&] (auto x)
         // {
         //     // make solution vector from given solution
         //     // and update variables
         //     SolutionVector curX;
         //     curX[0][0] = x;
-        //     curVariables.update(curX, origTime);
+        //     nonConstVars.update(curX, vars.time());
         //
         //     // assemble and return residual
-        //     this->assembleResidual(curX);
+        //     this->assembleResidual(nonConstVars);
         //     return this->res_[0][0];
         // };
         //
         // // write the partial derivative in jac_
-        // NumericDifferentiation::partialDerivative(evalRes, origSol[0][0], jac_, origRes[0][0]);
+        // NumericDifferentiation::partialDerivative(evalRes, vars.curSol()[0][0], jac_, origRes[0][0]);
         //
-        // // restore original state of the variables/residual
+        // // restore original state of the residual
         // res_ = origRes;
-        // curVariables = origGridVariables;
     }
 
     JacobianMatrix& jacobian() { return jac_; }
@@ -225,51 +220,36 @@ public:
     // THE FOLLOWING ARE ADDITIONAL NEW INTERFACES
     // - MAYBE WE CAN USE THESE FOR INSTATIONARY ASSEMBLERS
 
-    // constructor from a variables object
-    InstationaryMockAssembler(std::shared_ptr<Variables> variables)
-    : variables_(variables)
-    {}
-
-    // clean up potential clutter from previous time integrations
-    // maybe pass method instead of numStages??
-    void prepareTimeIntegration(std::size_t numStages)
-    {
-        numStages_ = numStages;
-        stageVariables_.clear();
-    }
-
-    // prepare a stage within time integration step
-    void prepareStage(const MultiStageSolutions<SolutionVector>& stageSolutions,
+    // prepare for a stage in a time integration step
+    void prepareStage(SolutionVector& x,
+                      Variables& vars,
                       std::shared_ptr<const StageParams> params)
     {
         stageParams_ = params;
+        const auto curStage = params->size() - 1;
 
-        // prepare variables objects required for current stage
-        const auto curStage = stageParams_->size()-1;
-        for (unsigned int k = stageVariables_.size(); k < stageParams_->size(); ++k)
-        {
-            const auto stageTime = stageParams_->timeAtStage(k);
+        // clean up if a new time step is started
+        if (curStage == 0)
+            stageVariables_.clear();
 
-            // in the last stage, use and update the externally given variables
-            if (k == stageParams_->size()-1 && curStage == numStages_)
-            {
-                variables_->update(stageSolutions[k], stageTime);
-                stageVariables_.push_back(variables_);
-            }
-            else
-                stageVariables_.push_back( std::make_shared<Variables>(stageSolutions[k], stageTime) );
-        }
+        // make sure the variables live on the correct time level
+        // (the solution in the vars should be the right one already, but so far
+        // we have no possibility to just update the time)
+        vars.update(x, params->timeAtStage(curStage));
     }
 
-    std::shared_ptr<Variables> variables() const
-    { return variables_; }
-
-    //////////////////////////////////////////////
-
-    //! TODO: INTERFACE THAT WE WANT TO RENAME T= JUST UPDATE?
-    void updateGridVariables(const SolutionVector& sol)
+    // register the state of a finished stage
+    void registerStage(SolutionVector& x,
+                       Variables& vars)
     {
-        stageVariables_.back()->update(sol, stageParams_->timeAtStage(stageParams_->size() - 1));
+        stageVariables_.emplace_back(vars);
+    }
+
+    //! update variables to new solution
+    void update(Variables& vars, const SolutionVector& x)
+    {
+        const auto curStage = stageParams_->size() - 1;
+        vars.update(x, stageParams_->timeAtStage(curStage));
     }
 
     ///////////////////////////////////////////
@@ -277,24 +257,20 @@ public:
     bool isStationaryProblem() { return false; }
     ResidualType prevSol() { return ResidualType(0.0); }
     void resetTimeStep(const ResidualType& sol) {}
-    double residualNorm(const ResidualType& sol)
+    void updateGridVariables(const SolutionVector& sol) {}
+    double residualNorm(const Variables& vars)
     {
-        assembleResidual(sol);
+        assembleResidual(vars);
         return res_[0][0];
     }
     ////////////////////////////////////////
 
 private:
-    //! externally provided variables object.
-    //! This is always updated to the current solution.
-    std::shared_ptr<Variables> variables_;
-
     JacobianMatrix jac_;
     ResidualType res_;
 
-    std::size_t numStages_;
     std::shared_ptr<const StageParams> stageParams_;
-    std::vector< std::shared_ptr<Variables> > stageVariables_;
+    std::vector<Variables> stageVariables_;
 };
 
 template<class Scalar>
@@ -342,10 +318,10 @@ int main(int argc, char* argv[]) try
 
     // variables storing everything required to evaluate the equations
     using Variables = typename Assembler::Variables;
-    auto vars = std::make_shared<Variables>(x, /*time=*/0.0);
+    Variables vars(x, /*time=*/0.0);
 
     // create PDE solver
-    auto assembler = std::make_shared<Assembler>(vars);
+    auto assembler = std::make_shared<Assembler>();
     auto linearSolver = std::make_shared<LinearSolver>();
     auto solver = std::make_shared<Solver>(assembler, linearSolver);
 
@@ -359,7 +335,7 @@ int main(int argc, char* argv[]) try
     std::array<Scalar, 5> expEulerValues;
     for (unsigned int i = 0; i < 5; ++i)
     {
-        timeStepper.step(x, i*dt, dt);
+        timeStepper.step(x, vars, i*dt, dt);
         expEulerValues[i] = x[0][0];
     }
 
@@ -372,7 +348,7 @@ int main(int argc, char* argv[]) try
     std::array<Scalar, 5> thetaValues;
     for (unsigned int i = 0; i < 5; ++i)
     {
-        timeStepper.step(x, i*dt, dt);
+        timeStepper.step(x, vars, i*dt, dt);
         thetaValues[i] = x[0][0];
     }
 
@@ -385,7 +361,7 @@ int main(int argc, char* argv[]) try
     std::array<Scalar, 5> impEulerValues;
     for (unsigned int i = 0; i < 5; ++i)
     {
-        timeStepper.step(x, i*dt, dt);
+        timeStepper.step(x, vars, i*dt, dt);
         impEulerValues[i] = x[0][0];
     }
 
@@ -398,7 +374,7 @@ int main(int argc, char* argv[]) try
     std::array<Scalar, 5> expRK4Values;
     for (unsigned int i = 0; i < 5; ++i)
     {
-        timeStepper.step(x, i*dt, dt);
+        timeStepper.step(x, vars, i*dt, dt);
         expRK4Values[i] = x[0][0];
     }
 
