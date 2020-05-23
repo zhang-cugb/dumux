@@ -39,7 +39,7 @@ template<class Scalar>
 class MultiStageParams
 {
     struct Params {
-        Scalar alpha, betaDt, timeAtStage;
+        Scalar alpha, betaDt, timeAtStage, dtFraction;
         bool skipTemporal, skipSpatial;
     };
 public:
@@ -54,6 +54,7 @@ public:
             p.alpha = m.temporalWeight(i, k);
             p.betaDt = m.spatialWeight(i, k)*dt;
             p.timeAtStage = t + m.timeStepWeight(k)*dt;
+            p.dtFraction = m.timeStepWeight(k);
 
             using std::abs;
             p.skipTemporal = (abs(p.alpha) < 1e-6);
@@ -75,6 +76,10 @@ public:
     //! the time at which we have to evaluate the operators
     Scalar timeAtStage (std::size_t k) const
     { return params_[k].timeAtStage; }
+
+    //! the fraction of a time step corresponding to the k-th stage
+    Scalar timeStepFraction (std::size_t k) const
+    { return params_[k].dtFraction; }
 
     //! If \f$ \alpha_{ik} = 0\f$
     Scalar skipTemporal (std::size_t k) const
