@@ -18,10 +18,11 @@
  *****************************************************************************/
 /*!
  * \file
- * \brief A wrapper for the local residual to make it usable within a multi-stage scheme
+ * \brief A wrapper for local operators to make it usable within a multi-stage
+ *        time integration schemes.
  */
-#ifndef DUMUX_TIMESTEPPING_MULTISTAGE_LOCALRESIDUAL_HH
-#define DUMUX_TIMESTEPPING_MULTISTAGE_LOCALRESIDUAL_HH
+#ifndef DUMUX_TIMESTEPPING_MULTISTAGE_LOCALOPERATOR_HH
+#define DUMUX_TIMESTEPPING_MULTISTAGE_LOCALOPERATOR_HH
 
 namespace Dumux {
 
@@ -34,55 +35,92 @@ template<class Scalar> class MultiStageParams;
  *       a stage can only depend on the values of the same stage and stages before
  *       but not future stages (which would require solving larger linear systems)
  */
-template<class LocalResidual>
-class MultiStageLocalResidual
+template<class LocalOperator>
+class MultiStageLocalOperator
 {
 public:
     //! export the types underlying the local residual we wrap around here
-    using Variables = typename LocalResidual::Variables;
-    using Residual = typename LocalResidual::Residual;
-    using Scalar = typename LocalResidual::Scalar;
+    // TODO: Exporting Residual in local operators doesn't make much sense.
+    //       Can we find something better!? They evaluate the terms of the
+    //       equation but not the entire residual. A more generic name for
+    //       the container type would be good.
+    using Variables = typename LocalOperator::Variables;
+    using Residual = typename LocalOperator::Residual;
+    using Scalar = typename LocalOperator::Scalar;
 
     /*!
      * \brief The constructor
      * \param localResiduals The local residuals required for this stage
      * \param params The parameters of this stage
      */
-    MultiStageLocalResidual(std::vector<LocalResidual>& localResiduals,
+    MultiStageLocalOperator(std::vector<LocalOperator>& localOperators,
                             const MultiStageParams<Scalar>& params)
-    : localResiduals_(localResiduals)
+    : localOperators_(localOperators)
     , stageParams_(params)
     {
-        if (localResiduals.empty())
-            DUNE_THROW(Dune::InvalidStateException, "At least one residual is required");
-        if (localResiduals.size() != params.size())
-            DUNE_THROW(Dune::InvalidStateException, "Size mismatch between residuals and stage params");
+        if (localOperators.empty())
+            DUNE_THROW(Dune::InvalidStateException, "At least one local operator is required");
+        if (localOperators.size() != params.size())
+            DUNE_THROW(Dune::InvalidStateException, "Size mismatch between operators and stage params");
     }
 
-    Residual eval()
+    //! evaluates the entire local residual
+    Residual evalLocalResidual()
     {
         // The residual returned by local residuals may be be a resizable
         // vector or simply a scalar. Thus, we require a way to construct
         // an empty residual!? This could be put elsewhere...
-        Residual residual = localResiduals_[0].getEmptyResidual();
+        Residual residual = localOperators_[0].getEmptyResidual();
 
         for (std::size_t k = 0; k < stageParams_.size(); ++k)
         {
             if (!stageParams_.skipTemporal(k))
-            { residual.axpy(stageParams_.temporalWeight(k), localResiduals_[k].evalStorage()); }
+            { residual.axpy(stageParams_.temporalWeight(k), localOperators_[k].evalStorage()); }
 
             if (!stageParams_.skipSpatial(k))
-            { residual.axpy(stageParams_.spatialWeight(k), localResiduals_[k].evalFluxesAndSources()); }
+            { residual.axpy(stageParams_.spatialWeight(k), localOperators_[k].evalFluxesAndSources()); }
         }
 
         return residual;
+    }
+
+    Residual evalStorage()
+    {
+        // The residual returned by local residuals may be be a resizable
+        // vector or simply a scalar. Thus, we require a way to construct
+        // an empty residual!? This could be put elsewhere...
+        Residual result = localOperators_[0].getEmptyResidual();
+
+        for (std::size_t k = 0; k < stageParams_.size(); ++k)
+        {
+            if (!stageParams_.skipTemporal(k))
+            { result.axpy(stageParams_.temporalWeight(k), localOperators_[k].evalStorage()); }
+        }
+
+        return result;
+    }
+
+    Residual evalFluxesAndSources()
+    {
+        // The residual returned by local residuals may be be a resizable
+        // vector or simply a scalar. Thus, we require a way to construct
+        // an empty residual!? This could be put elsewhere...
+        Residual result = localOperators_[0].getEmptyResidual();
+
+        for (std::size_t k = 0; k < stageParams_.size(); ++k)
+        {
+            if (!stageParams_.skipSpatial(k))
+            { result.axpy(stageParams_.spatialWeight(k), localOperators_[k].evalFluxesAndSources()); }
+        }
+
+        return result;
     }
 
     //! TODO: SHOULD THIS HAVE EVALTEMPORAL() AND EVALSPATIAL() AS WELL?
     //!       I.E. SHOULD IT BEHAVE LIKE A STANDARD LOCALRESIDUAL?
 
 private:
-    std::vector<LocalResidual>& localResiduals_;
+    std::vector<LocalOperator>& localOperators_;
     const MultiStageParams<Scalar>& stageParams_;
 };
 

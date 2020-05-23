@@ -11,7 +11,7 @@
 #include <dumux/nonlinear/newtonsolver.hh>
 
 #include <dumux/timestepping/multistagetimestepper.hh>
-#include <dumux/timestepping/multistagelocalresidual.hh>
+#include <dumux/timestepping/multistagelocaloperator.hh>
 #include <dumux/timestepping/multistagemethods.hh>
 
 /*
@@ -82,7 +82,7 @@ private:
 // s(u, t), while evalSpatial() evaluates F(u, t).
 // This residual implementation evaluates du/dt - e^t = 0.
 template<class Vars>
-class MockLocalResidual
+class MockLocalOperator
 {
 public:
     //! export the type containing the variables required to evaluate the residual
@@ -99,13 +99,9 @@ public:
     //! construct it from that. Construction is done in our test assembler class.
     //! In grid based methods, there is a local assembler between the assembler
     //! and the local residual, which could construct it from a local view.
-    MockLocalResidual(const Variables& variables)
+    MockLocalOperator(const Variables& variables)
     : variables_(variables)
     {}
-
-    //! evalute the local residual
-    Residual eval() const
-    { return evalStorage() + evalFluxesAndSources(); }
 
     // evaluate the term appearing in time derivative
     Residual evalStorage() const
@@ -126,7 +122,7 @@ public:
     //! TODO: This is a newly introduced interface. Residuals (for grid-based
     //!       schemes ElementResidualVector) are generally resizable vectors,
     //!       containing the residual at all dofs of an element. In instationary
-    //!       settings using MultiStageLocalResidual, the MultiStageLocalResidual
+    //!       settings using MultiStageLocalOperator, the MultiStageLocalOperator
     //!       computes the residual by summing up several weighted terms. It is
     //!       therefore handy to be able to get a (correctly resized if needed)
     //!       empty residual in which to add up things. Alternatively, we could
@@ -141,12 +137,12 @@ private:
     const Variables& variables_;
 };
 
-template<class LocalResidual>
+template<class LocalOperator>
 class InstationaryMockAssembler
 {
 public:
     //! export the variable type used for residual evaluations
-    using Variables = typename LocalResidual::Variables;
+    using Variables = typename LocalOperator::Variables;
 
     //! export underlying data types
     using Scalar = typename Variables::Scalar;
@@ -165,15 +161,15 @@ public:
 
     void assembleResidual(const Variables& vars)
     {
-        // wrap multi-stage residual around local residuals
-        std::vector<LocalResidual> localResiduals;
-        localResiduals.reserve(stageParams_->size());
+        // wrap multi-stage residual around local operators
+        std::vector<LocalOperator> localOperators;
+        localOperators.reserve(stageParams_->size());
         for (std::size_t i = 0; i < stageParams_->size()-1; ++i)
-            localResiduals.emplace_back(stageVariables_[i]);
-        localResiduals.emplace_back(vars);
+            localOperators.emplace_back(stageVariables_[i]);
+        localOperators.emplace_back(vars);
 
-        using MSLocalResidual = MultiStageLocalResidual<LocalResidual>;
-        res_[0][0] = MSLocalResidual(localResiduals, *stageParams_).eval();
+        using MSLocalOperator = MultiStageLocalOperator<LocalOperator>;
+        res_[0][0] = MSLocalOperator(localOperators, *stageParams_).evalLocalResidual();
     }
 
     void assembleJacobianAndResidual(const Variables& vars)
@@ -306,9 +302,9 @@ int main(int argc, char* argv[]) try
     using SolutionVector = Dune::FieldVector<PrimaryVariables, 1>;
 
     using Variables = MockVariables<SolutionVector>;
-    using LocalResidual = MockLocalResidual<Variables>;
+    using LocalOperator = MockLocalOperator<Variables>;
 
-    using Assembler = InstationaryMockAssembler<LocalResidual>;
+    using Assembler = InstationaryMockAssembler<LocalOperator>;
     using LinearSolver = MockLinearSolver<Scalar>;
     using Solver = NewtonSolver<Assembler, LinearSolver, DefaultPartialReassembler>;
 
