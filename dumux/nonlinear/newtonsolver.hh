@@ -51,6 +51,7 @@
 
 #include "newtonconvergencewriter.hh"
 #include "primaryvariableswitchadapter.hh"
+#include "newtonvariablesbackend.hh"
 
 namespace Dumux {
 namespace Detail {
@@ -85,13 +86,18 @@ class NewtonSolver : public PDESolver<Assembler, LinearSolver>
     using ParentType = PDESolver<Assembler, LinearSolver>;
     using Scalar = typename Assembler::Scalar;
     using JacobianMatrix = typename Assembler::JacobianMatrix;
-    using SolutionVector = typename Assembler::ResidualType;
-    using ConvergenceWriter = ConvergenceWriterInterface<SolutionVector>;
     using TimeLoop = TimeLoopBase<Scalar>;
 
     // enable models with primary variable switch
     // TODO: Use more general Assembler::Variables once it is available
-    using PrimaryVariableSwitchAdapter = Dumux::PrimaryVariableSwitchAdapter<typename Assembler::GridVariables>;
+    using PrimaryVariableSwitchAdapter = Dumux::PrimaryVariableSwitchAdapter<typename Assembler::Variables>;
+
+    // the variable backend
+    using Variables = typename Assembler::Variables;
+    using Backend = NewtonVariablesBackend<Variables>;
+
+    using SolutionVector = typename Backend::DofVector;
+    using ConvergenceWriter = ConvergenceWriterInterface<SolutionVector>;
 public:
 
     using Communication = Comm;
@@ -262,11 +268,11 @@ public:
             convergenceWriter_->write(u, delta, this->assembler().residual());
         }
 
-        if (enablePartialReassembly_)
-        {
-            partialReassembler_->resetColors();
-            resizeDistanceFromLastLinearization_(u, distanceFromLastLinearization_);
-        }
+        // if (enablePartialReassembly_)
+        // {
+        //     partialReassembler_->resetColors();
+        //     resizeDistanceFromLastLinearization_(u, distanceFromLastLinearization_);
+        // }
     }
 
     /*!
@@ -342,14 +348,7 @@ public:
         try
         {
             if (numSteps_ == 0)
-            {
-                Scalar norm2 = b.two_norm2();
-                if (comm_.size() > 1)
-                    norm2 = comm_.sum(norm2);
-
-                using std::sqrt;
-                initialResidual_ = sqrt(norm2);
-            }
+                initialResidualNorm_ = this->linearSolver().norm(b);
 
             // solve by calling the appropriate implementation depending on whether the linear solver
             // is capable of handling MultiType matrices or not
@@ -406,40 +405,40 @@ public:
         if (enableShiftCriterion_ || enablePartialReassembly_)
             newtonUpdateShift_(uLastIter, deltaU);
 
-        if (enablePartialReassembly_) {
-            // Determine the threshold 'eps' that is used for the partial reassembly.
-            // Every entity where the primary variables exhibit a relative shift
-            // summed up since the last linearization above 'eps' will be colored
-            // red yielding a reassembly.
-            // The user can provide three parameters to influence the threshold:
-            // 'minEps' by 'Newton.ReassemblyMinThreshold' (1e-1*shiftTolerance_ default)
-            // 'maxEps' by 'Newton.ReassemblyMaxThreshold' (1e2*shiftTolerance_ default)
-            // 'omega'  by 'Newton.ReassemblyShiftWeight'  (1e-3 default)
-            // The threshold is calculated from the currently achieved maximum
-            // relative shift according to the formula
-            // eps = max( minEps, min(maxEps, omega*shift) ).
-            // Increasing/decreasing 'minEps' leads to less/more reassembly if
-            // 'omega*shift' is small, i.e., for the last Newton iterations.
-            // Increasing/decreasing 'maxEps' leads to less/more reassembly if
-            // 'omega*shift' is large, i.e., for the first Newton iterations.
-            // Increasing/decreasing 'omega' leads to more/less first and last
-            // iterations in this sense.
-            using std::max;
-            using std::min;
-            auto reassemblyThreshold = max(reassemblyMinThreshold_,
-                                           min(reassemblyMaxThreshold_,
-                                               shift_*reassemblyShiftWeight_));
-
-            updateDistanceFromLastLinearization_(uLastIter, deltaU);
-            partialReassembler_->computeColors(this->assembler(),
-                                               distanceFromLastLinearization_,
-                                               reassemblyThreshold);
-
-            // set the discrepancy of the red entities to zero
-            for (unsigned int i = 0; i < distanceFromLastLinearization_.size(); i++)
-                if (partialReassembler_->dofColor(i) == EntityColor::red)
-                    distanceFromLastLinearization_[i] = 0;
-        }
+        // if (enablePartialReassembly_) {
+        //     // Determine the threshold 'eps' that is used for the partial reassembly.
+        //     // Every entity where the primary variables exhibit a relative shift
+        //     // summed up since the last linearization above 'eps' will be colored
+        //     // red yielding a reassembly.
+        //     // The user can provide three parameters to influence the threshold:
+        //     // 'minEps' by 'Newton.ReassemblyMinThreshold' (1e-1*shiftTolerance_ default)
+        //     // 'maxEps' by 'Newton.ReassemblyMaxThreshold' (1e2*shiftTolerance_ default)
+        //     // 'omega'  by 'Newton.ReassemblyShiftWeight'  (1e-3 default)
+        //     // The threshold is calculated from the currently achieved maximum
+        //     // relative shift according to the formula
+        //     // eps = max( minEps, min(maxEps, omega*shift) ).
+        //     // Increasing/decreasing 'minEps' leads to less/more reassembly if
+        //     // 'omega*shift' is small, i.e., for the last Newton iterations.
+        //     // Increasing/decreasing 'maxEps' leads to less/more reassembly if
+        //     // 'omega*shift' is large, i.e., for the first Newton iterations.
+        //     // Increasing/decreasing 'omega' leads to more/less first and last
+        //     // iterations in this sense.
+        //     using std::max;
+        //     using std::min;
+        //     auto reassemblyThreshold = max(reassemblyMinThreshold_,
+        //                                    min(reassemblyMaxThreshold_,
+        //                                        shift_*reassemblyShiftWeight_));
+        //
+        //     updateDistanceFromLastLinearization_(uLastIter, deltaU);
+        //     partialReassembler_->computeColors(this->assembler(),
+        //                                        distanceFromLastLinearization_,
+        //                                        reassemblyThreshold);
+        //
+        //     // set the discrepancy of the red entities to zero
+        //     for (unsigned int i = 0; i < distanceFromLastLinearization_.size(); i++)
+        //         if (partialReassembler_->dofColor(i) == EntityColor::red)
+        //             distanceFromLastLinearization_[i] = 0;
+        // }
 
         if (useLineSearch_)
             lineSearchUpdate_(uCurrentIter, uLastIter, deltaU);
@@ -694,9 +693,11 @@ protected:
 
     void computeResidualReduction_(const SolutionVector &uCurrentIter)
     {
-        residualNorm_ = this->assembler().residualNorm(uCurrentIter);
+        auto residual = Backend::makeZeroDofVector(Backend::size(uCurrentIter));
+        this->assembler().assembleResidual(residual, uCurrentIter);
+        residualNorm_ = this->linearSolver().norm(residual);
         reduction_ = residualNorm_;
-        reduction_ /= initialResidual_;
+        reduction_ /= initialResidualNorm_;
     }
 
     bool enableResidualCriterion() const
@@ -715,7 +716,7 @@ protected:
     Scalar reduction_;
     Scalar residualNorm_;
     Scalar lastReduction_;
-    Scalar initialResidual_;
+    Scalar initialResidualNorm_;
 
     // shift criterion variables
     Scalar shift_;
@@ -739,8 +740,8 @@ private:
             newtonBegin(uCurrentIter);
 
             // the given solution is the initial guess
-            SolutionVector uLastIter(uCurrentIter);
-            SolutionVector deltaU(uCurrentIter);
+            auto uLastIter = Backend::makeDofVector(uCurrentIter);
+            auto deltaU = Backend::makeDofVector(uCurrentIter);
 
             // setup timers
             Dune::Timer assembleTimer(false);
@@ -887,43 +888,41 @@ private:
     virtual void newtonUpdateShift_(const SolutionVector &uLastIter,
                                     const SolutionVector &deltaU)
     {
-        shift_ = 0;
-        newtonUpdateShiftImpl_(uLastIter, deltaU);
-
+        shift_ = Backend::maxRelativeShift(uLastIter, deltaU);
         if (comm_.size() > 1)
             shift_ = comm_.max(shift_);
     }
 
-    template<class SolVec>
-    void newtonUpdateShiftImpl_(const SolVec &uLastIter,
-                                const SolVec &deltaU)
-    {
-        for (int i = 0; i < int(uLastIter.size()); ++i)
-        {
-            auto uNewI = uLastIter[i];
-            uNewI -= deltaU[i];
+    // template<class SolVec>
+    // void newtonUpdateShiftImpl_(const SolVec &uLastIter,
+    //                             const SolVec &deltaU)
+    // {
+    //     for (int i = 0; i < int(uLastIter.size()); ++i)
+    //     {
+    //         auto uNewI = uLastIter[i];
+    //         uNewI -= deltaU[i];
+    //
+    //         Scalar shiftAtDof = relativeShiftAtDof_(uLastIter[i], uNewI);
+    //         using std::max;
+    //         shift_ = max(shift_, shiftAtDof);
+    //     }
+    // }
 
-            Scalar shiftAtDof = relativeShiftAtDof_(uLastIter[i], uNewI);
-            using std::max;
-            shift_ = max(shift_, shiftAtDof);
-        }
-    }
-
-    template<class ...Args>
-    void newtonUpdateShiftImpl_(const Dune::MultiTypeBlockVector<Args...> &uLastIter,
-                                const Dune::MultiTypeBlockVector<Args...> &deltaU)
-    {
-        // There seems to be a bug in g++5 which which prevents compilation when
-        // passing the call to the implementation directly to Dune::Hybrid::forEach.
-        // We therefore store this call in a lambda and pass it to the for loop afterwards.
-        auto doUpdate = [&](const auto subVectorIdx)
-        {
-            this->newtonUpdateShiftImpl_(uLastIter[subVectorIdx], deltaU[subVectorIdx]);
-        };
-
-        using namespace Dune::Hybrid;
-        forEach(integralRange(Dune::Hybrid::size(uLastIter)), doUpdate);
-    }
+    // template<class ...Args>
+    // void newtonUpdateShiftImpl_(const Dune::MultiTypeBlockVector<Args...> &uLastIter,
+    //                             const Dune::MultiTypeBlockVector<Args...> &deltaU)
+    // {
+    //     // There seems to be a bug in g++5 which which prevents compilation when
+    //     // passing the call to the implementation directly to Dune::Hybrid::forEach.
+    //     // We therefore store this call in a lambda and pass it to the for loop afterwards.
+    //     auto doUpdate = [&](const auto subVectorIdx)
+    //     {
+    //         this->newtonUpdateShiftImpl_(uLastIter[subVectorIdx], deltaU[subVectorIdx]);
+    //     };
+    //
+    //     using namespace Dune::Hybrid;
+    //     forEach(integralRange(Dune::Hybrid::size(uLastIter)), doUpdate);
+    // }
 
     virtual void lineSearchUpdate_(SolutionVector &uCurrentIter,
                                    const SolutionVector &uLastIter,
@@ -982,25 +981,30 @@ private:
                            SolutionVector& x,
                            SolutionVector& b)
     {
-        //! Copy into a standard block vector.
-        //! This is necessary for all model _not_ using a FieldVector<Scalar, blockSize> as
-        //! primary variables vector in combination with UMFPack or SuperLU as their interfaces are hard coded
-        //! to this field vector type in Dune ISTL
-        //! Could be avoided for vectors that already have the right type using SFINAE
-        //! but it shouldn't impact performance too much
-        constexpr auto blockSize = std::decay_t<decltype(b[0])>::dimension;
-        using BlockType = Dune::FieldVector<Scalar, blockSize>;
-        Dune::BlockVector<BlockType> xTmp; xTmp.resize(b.size());
-        Dune::BlockVector<BlockType> bTmp(xTmp);
-        for (unsigned int i = 0; i < b.size(); ++i)
-            for (unsigned int j = 0; j < blockSize; ++j)
-                bTmp[i][j] = b[i][j];
+        // //! Copy into a standard block vector.
+        // //! This is necessary for all model _not_ using a FieldVector<Scalar, blockSize> as
+        // //! primary variables vector in combination with UMFPack or SuperLU as their interfaces are hard coded
+        // //! to this field vector type in Dune ISTL
+        // //! Could be avoided for vectors that already have the right type using SFINAE
+        // //! but it shouldn't impact performance too much
+        // constexpr auto blockSize = std::decay_t<decltype(b[0])>::dimension;
+        // using BlockType = Dune::FieldVector<Scalar, blockSize>;
+        // Dune::BlockVector<BlockType> xTmp; xTmp.resize(b.size());
+        // Dune::BlockVector<BlockType> bTmp(xTmp);
+        // for (unsigned int i = 0; i < b.size(); ++i)
+        //     for (unsigned int j = 0; j < blockSize; ++j)
+        //         bTmp[i][j] = b[i][j];
+
+        auto xTmp = Backend::makeZeroDofVectorForSolver(Backend::size(b));
+        auto bTmp = Backend::makeDofVectorForSolver(b);
 
         const int converged = ls.solve(A, xTmp, bTmp);
 
-        for (unsigned int i = 0; i < x.size(); ++i)
-            for (unsigned int j = 0; j < blockSize; ++j)
-                x[i][j] = xTmp[i][j];
+        x = Backend::reconstructDofVectorFromSolver(xTmp);
+
+        // for (unsigned int i = 0; i < x.size(); ++i)
+        //     for (unsigned int j = 0; j < blockSize; ++j)
+        //         x[i][j] = xTmp[i][j];
 
         return converged;
     }
@@ -1117,63 +1121,63 @@ private:
             reportParams();
     }
 
-    template<class Sol>
-    void updateDistanceFromLastLinearization_(const Sol& u, const Sol& uDelta)
-    {
-        for (size_t i = 0; i < u.size(); ++i) {
-            const auto& currentPriVars(u[i]);
-            auto nextPriVars(currentPriVars);
-            nextPriVars -= uDelta[i];
+    // template<class Sol>
+    // void updateDistanceFromLastLinearization_(const Sol& u, const Sol& uDelta)
+    // {
+    //     for (size_t i = 0; i < u.size(); ++i) {
+    //         const auto& currentPriVars(u[i]);
+    //         auto nextPriVars(currentPriVars);
+    //         nextPriVars -= uDelta[i];
+    //
+    //         // add the current relative shift for this degree of freedom
+    //         auto shift = relativeShiftAtDof_(currentPriVars, nextPriVars);
+    //         distanceFromLastLinearization_[i] += shift;
+    //     }
+    // }
+    //
+    // template<class ...Args>
+    // void updateDistanceFromLastLinearization_(const Dune::MultiTypeBlockVector<Args...>& uLastIter,
+    //                                           const Dune::MultiTypeBlockVector<Args...>& deltaU)
+    // {
+    //     DUNE_THROW(Dune::NotImplemented, "Reassembly for MultiTypeBlockVector");
+    // }
 
-            // add the current relative shift for this degree of freedom
-            auto shift = relativeShiftAtDof_(currentPriVars, nextPriVars);
-            distanceFromLastLinearization_[i] += shift;
-        }
-    }
+    // template<class Sol>
+    // void resizeDistanceFromLastLinearization_(const Sol& u, std::vector<Scalar>& dist)
+    // {
+    //     dist.assign(u.size(), 0.0);
+    // }
+    //
+    // template<class ...Args>
+    // void resizeDistanceFromLastLinearization_(const Dune::MultiTypeBlockVector<Args...>& u,
+    //                                           std::vector<Scalar>& dist)
+    // {
+    //     DUNE_THROW(Dune::NotImplemented, "Reassembly for MultiTypeBlockVector");
+    // }
 
-    template<class ...Args>
-    void updateDistanceFromLastLinearization_(const Dune::MultiTypeBlockVector<Args...>& uLastIter,
-                                              const Dune::MultiTypeBlockVector<Args...>& deltaU)
-    {
-        DUNE_THROW(Dune::NotImplemented, "Reassembly for MultiTypeBlockVector");
-    }
-
-    template<class Sol>
-    void resizeDistanceFromLastLinearization_(const Sol& u, std::vector<Scalar>& dist)
-    {
-        dist.assign(u.size(), 0.0);
-    }
-
-    template<class ...Args>
-    void resizeDistanceFromLastLinearization_(const Dune::MultiTypeBlockVector<Args...>& u,
-                                              std::vector<Scalar>& dist)
-    {
-        DUNE_THROW(Dune::NotImplemented, "Reassembly for MultiTypeBlockVector");
-    }
-
-    /*!
-     * \brief Returns the maximum relative shift between two vectors of
-     *        primary variables.
-     *
-     * \param priVars1 The first vector of primary variables
-     * \param priVars2 The second vector of primary variables
-     */
-    template<class PrimaryVariables>
-    Scalar relativeShiftAtDof_(const PrimaryVariables &priVars1,
-                               const PrimaryVariables &priVars2) const
-    {
-        Scalar result = 0.0;
-        using std::abs;
-        using std::max;
-        // iterate over all primary variables
-        for (int j = 0; j < PrimaryVariables::dimension; ++j) {
-            Scalar eqErr = abs(priVars1[j] - priVars2[j]);
-            eqErr /= max<Scalar>(1.0,abs(priVars1[j] + priVars2[j])/2);
-
-            result = max(result, eqErr);
-        }
-        return result;
-    }
+    // /*!
+    //  * \brief Returns the maximum relative shift between two vectors of
+    //  *        primary variables.
+    //  *
+    //  * \param priVars1 The first vector of primary variables
+    //  * \param priVars2 The second vector of primary variables
+    //  */
+    // template<class PrimaryVariables>
+    // Scalar relativeShiftAtDof_(const PrimaryVariables &priVars1,
+    //                            const PrimaryVariables &priVars2) const
+    // {
+    //     Scalar result = 0.0;
+    //     using std::abs;
+    //     using std::max;
+    //     // iterate over all primary variables
+    //     for (int j = 0; j < PrimaryVariables::dimension; ++j) {
+    //         Scalar eqErr = abs(priVars1[j] - priVars2[j]);
+    //         eqErr /= max<Scalar>(1.0,abs(priVars1[j] + priVars2[j])/2);
+    //
+    //         result = max(result, eqErr);
+    //     }
+    //     return result;
+    // }
 
     //! The communication object
     Communication comm_;
