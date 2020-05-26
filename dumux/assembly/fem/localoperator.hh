@@ -52,7 +52,6 @@ class FELocalOperator
     using GridVars = typename GridVarsLocalView::GridVariables;
     using IpVariables = typename GridVars::IntegrationPointVariables;
     using PrimaryVariables = typename GridVars::PrimaryVariables;
-    using Scalar = typename PrimaryVariables::value_type;
 
     // The grid geometry on which the scheme operates
     using GridGeometry = typename GridVars::GridGeometry;
@@ -73,8 +72,17 @@ public:
     //! export the grid variables type this residual requires a local view of
     using GridVariables = GridVars;
 
+    //! export a grid-independent alias for compatibility with non grid-based schemes
+    using Variables = GridVars;
+
+    //! export underlying scalar type
+    using Scalar = typename PrimaryVariables::value_type;
+
     //! the container storing the residual on all dofs of an element
     using ElementResidualVector = Dune::BlockVector<NumEqVector>;
+
+    //! export a grid-independent alias for compatibility with non grid-based schemes
+    using Residual = ElementResidualVector;
 
     /*!
      * \brief The constructor
@@ -127,6 +135,14 @@ public:
         { return operators_.storage(ipData, ipVars); };
 
         return integrateVolumeTerms_(volumeTerms);
+    }
+
+    ElementResidualVector getEmptyResidual() const
+    {
+        const auto& localView = feGeometry().feBasisLocalView();
+        ElementResidualVector res(localView.tree().finiteElement().localBasis().size());
+        res = 0.0;
+        return res;
     }
 
     // \}
