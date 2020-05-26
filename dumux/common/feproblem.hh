@@ -32,6 +32,7 @@
 
 #include <dumux/common/parameters.hh>
 #include <dumux/common/boundarytypes.hh>
+#include <dumux/timestepping/timelevel.hh>
 
 namespace Dumux {
 
@@ -69,6 +70,7 @@ class FEProblem
     using NumEqVector = typename ProblemTraits<Impl>::NumEqVector;
     using PrimaryVariables = typename ProblemTraits<Impl>::PrimaryVariables;
     using Scalar = typename ProblemTraits<Impl>::Scalar;
+    using TimeLevel = Dumux::TimeLevel<Scalar>;
 
     static constexpr int dim = GridView::dimension;
 
@@ -113,6 +115,20 @@ public:
 
     /*!
      * \brief Specifies which kind of boundary condition should be used for
+     *        which equation at the given time level and on the degrees of freedom
+     *        living on the given sub entity of the given grid element.
+     * \param element The grid element on which the degree of freedom
+     * \param subEntity The element's sub entity located on the domain boundary
+     * \param timeLevel the time level
+     */
+    template<class SubEntity>
+    BoundaryTypes boundaryTypes(const Element& element,
+                                const SubEntity& subEntity,
+                                const TimeLevel& timeLevel) const
+    { return asImp_().boundaryTypes(element, subEntity); }
+
+    /*!
+     * \brief Specifies which kind of boundary condition should be used for
      *        which equation on the degrees of freedom living on the given
      *        sub entity of the given grid element.
      * \param element The grid element on which the degree of freedom
@@ -135,6 +151,20 @@ public:
         bcTypes.setAllDirichlet();
         return bcTypes;
     }
+
+    /*!
+     * \brief Evaluate the Dirichlet boundary conditions at the given time for a boundary
+     *        entity (sub entity of a grid element) that carries degrees of freedom.
+     * \param element The grid element
+     * \param subEntity The element's sub entity living on the boundary
+     * \param timeLevel The time level
+     * \note The values will be assigned to all dofs living on that sub entity
+     */
+    template<class SubEntity>
+    PrimaryVariables dirichlet(const Element& element,
+                               const SubEntity& subEntity,
+                               const TimeLevel& timeLevel) const
+    { return asImp_().dirichlet(element, subEntity); }
 
     /*!
      * \brief Evaluate the Dirichlet boundary conditions for a boundary
@@ -174,14 +204,14 @@ public:
      *
      * \param element The grid element
      * \param is The intersection
-     * \param elemSol The element solution vector
+     * \param gridVarsLocalView Local view on the grid variables
      * \param ipData Shape function values/gradients evaluated at an integration point
      * \param ipVars The primary/secondary variables evaluated at an integration point
      */
-    template<class ElementSolution, class IpData, class IpVariables>
+    template<class GridVarsLocalView, class IpData, class IpVariables>
     NumEqVector neumann(const Element& element,
                         const Intersection& is,
-                        const ElementSolution& elemSol,
+                        const GridVarsLocalView& gridVarsLocalView,
                         const IpData& ipData,
                         const IpVariables& ipVars) const
     { return asImp_().neumannAtPos(ipData.ipGlobal()); }
@@ -204,14 +234,14 @@ public:
      *
      * \param element The grid element
      * \param feGeometry The finite element geometry
-     * \param elemSol The element solution vector
+     * \param gridVarsLocalView Local view on the grid variables
      * \param ipData Shape function values/gradients evaluated at an integration point
      * \param ipVars The primary/secondary variables evaluated at an integration point
      */
-    template<class ElementSolution, class IpData, class IpVariables>
+    template<class GridVarsLocalView, class IpData, class IpVariables>
     NumEqVector source(const Element& element,
                        const FEElementGeometry& feGeometry,
-                       const ElementSolution& elemSol,
+                       const GridVarsLocalView& gridVarsLocalView,
                        const IpData& ipData,
                        const IpVariables& ipVars) const
     { return asImp_().sourceAtPos(ipData.ipGlobal()); }

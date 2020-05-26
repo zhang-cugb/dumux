@@ -27,6 +27,7 @@
 
 #include <cassert>
 #include <dumux/discretization/localview.hh>
+#include <dumux/timestepping/timelevel.hh>
 
 #include "elementsolution.hh"
 #include "ipvariablesbase.hh"
@@ -143,9 +144,13 @@ public:
     //! The local view on these grid variables
     using LocalView = FEGridVariablesLocalView<ThisType>;
 
+    //! Type representing a time level
+    using TimeLevel = Dumux::TimeLevel<Scalar>;
+
     //! constructor
     FEGridVariables(std::shared_ptr<const Problem> problem)
     : problem_(problem)
+    , timeLevel_(0.0)
     {}
 
     //! return the underlying problem
@@ -165,37 +170,55 @@ public:
     //       DO WE NEED ALL OF THEM?
     //////////////
 
-    //! initialize all variables
+    //! initialize all variables for a given solution
     void init(const SolutionVector& x)
     {
         x_ = &x;
+        considerTimeLevels_ = false;
     }
 
-    //! update all variables
-    void update(const SolutionVector& x, bool forceUpdate = false)
+    //! initialize all variables for a given solution and time level
+    void init(const SolutionVector& x, const TimeLevel& timeLevel)
     {
+        x_ = &x;
+        timeLevel_ = timeLevel;
+        considerTimeLevels_ = true;
+    }
+
+    //! update all variables subject to a new solution
+    void update(const SolutionVector& x)
+    {
+        if (considerTimeLevels_)
+            DUNE_THROW(Dune::InvalidStateException,
+                       "GridVariables have been initialized as instationary. Please use update(x, timelevel)");
         x_ = &x;
     }
 
-    //! update all variables after grid adaption
-    void updateAfterGridAdaption(const SolutionVector& x)
+    //! update all variables subject to a new solution
+    void update(const SolutionVector& x, const TimeLevel& timeLevel)
     {
+        if (!considerTimeLevels_)
+            DUNE_THROW(Dune::InvalidStateException,
+                       "GridVariables have been initialized as stationary. Please use update(x)");
         x_ = &x;
+        timeLevel_ = timeLevel;
     }
 
-    //! Sets the current state as the previous for next time step
-    void advanceTimeStep()
-    {}
-
-    //! resets state to the one before time integration
-    void resetTimeStep(const SolutionVector& x)
+    //! return the time level the grid variables represent
+    const TimeLevel& timeLevel() const
     {
-        x_ = &x;
+        if (!considerTimeLevels_)
+            DUNE_THROW(Dune::InvalidStateException,
+                       "GridVariables have been initialized as stationary. No time level data available");
+        return timeLevel_;
     }
 
 private:
     std::shared_ptr<const Problem> problem_; //!< pointer to the problem to be solved
-    const SolutionVector* x_ = nullptr; //!< the solution corresponding to this class' current state
+    const SolutionVector* x_ = nullptr;      //!< the solution corresponding to this class' current state
+
+    TimeLevel timeLevel_;             //!< info during time integration for instationary problems
+    bool considerTimeLevels_ = false; //!< keep track if a time level was set
 };
 
 } // end namespace Dumux

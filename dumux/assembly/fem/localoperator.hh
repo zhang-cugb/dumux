@@ -326,7 +326,7 @@ protected:
                 ipVars.update(gridVariablesLocalView().elemSol(), problem_(), element(), ipData);
 
                 // evaluate neumann boundary condition
-                const auto neumannFlux = problem_().neumann(element(), is, gridVariablesLocalView().elemSol(), ipData, ipVars);
+                const auto neumannFlux = problem_().neumann(element(), is, gridVariablesLocalView(), ipData, ipVars);
 
                 // get quadrature rule weight for intersection
                 Scalar qWeight = quadPoint.weight();
