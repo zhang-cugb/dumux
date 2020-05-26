@@ -59,8 +59,10 @@ class FEOperatorsBase
 
 public:
 
-    // The flux term has size dim per equation
+    // export the types of the flux/source/storage terms
     using FluxTerm = Dune::FieldMatrix<Scalar, numEq, dim>;
+    using SourceTerm = NumEqVector;
+    using StorageTerm = NumEqVector;
 
     /*!
      * \brief The constructor
