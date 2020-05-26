@@ -107,7 +107,7 @@ public:
     {
         // evaluate both the volume and the flux terms
         auto volumeTerms = [&] (const auto& ipData, const auto& ipVars)
-        { return operators_.source(ipData, ipVars); };
+        { auto s = operators_.source(ipData, ipVars); s *= -1.0; return s; };
 
         auto fluxTerms = [&] (const auto& ipData, const auto& ipVars)
         { return operators_.flux(ipData, ipVars); };
