@@ -1,0 +1,16 @@
+[TimeLoop]
+TEnd = 0.05
+Dt = 0.01
+
+[Grid]
+UpperRight = 3 3
+Cells = 4 4
+
+[Problem]
+Name = algebraic
+
+[SpatialParams]
+TensorValue = 1
+
+[Newton]
+Verbosity = 0
