@@ -43,6 +43,7 @@
 #include <dumux/common/exceptions.hh>
 #include <dumux/common/typetraits/vector.hh>
 #include <dumux/common/typetraits/isvalid.hh>
+#include <dumux/common/timeloop.hh>
 #include <dumux/common/pdesolver.hh>
 #include <dumux/linear/linearsolveracceptsmultitypematrix.hh>
 #include <dumux/linear/matrixconverter.hh>
@@ -88,13 +89,12 @@ template <class Assembler, class LinearSolver,
 class NewtonSolver : public PDESolver<Assembler, LinearSolver>
 {
     using ParentType = PDESolver<Assembler, LinearSolver>;
-
     using Scalar = typename Assembler::Scalar;
-    using Variables = typename Assembler::Variables;
     using JacobianMatrix = typename Assembler::JacobianMatrix;
     using SolutionVector = typename Assembler::ResidualType;
-
     using ConvergenceWriter = ConvergenceWriterInterface<SolutionVector>;
+    using TimeLoop = TimeLoopBase<Scalar>;
+
     using PrimaryVariableSwitch = typename Detail::GetPVSwitch<Assembler>::type;
     using HasPriVarsSwitch = typename Detail::GetPVSwitch<Assembler>::value_t; // std::true_type or std::false_type
     static constexpr bool hasPriVarsSwitch() { return HasPriVarsSwitch::value; };
@@ -200,13 +200,55 @@ public:
 
     /*!
      * \brief Run the Newton method to solve a non-linear system.
-     *        The solver is responsible for all the strategic decisions.
-     * \param uCurrentIter The solution at the current iteration
-     * \param varsCurrentIter The variables at the current iteration
+     *        Does time step control when the Newton fails to converge
      */
-    void solve(SolutionVector& uCurrentIter, Variables& varsCurrentIter) override
+    void solve(SolutionVector& uCurrentIter, TimeLoop& timeLoop) override
     {
-        const bool converged = solve_(uCurrentIter, varsCurrentIter);
+        if (this->assembler().isStationaryProblem())
+            DUNE_THROW(Dune::InvalidStateException, "Using time step control with stationary problem makes no sense!");
+
+        // try solving the non-linear system
+        for (std::size_t i = 0; i <= maxTimeStepDivisions_; ++i)
+        {
+            // linearize & solve
+            const bool converged = solve_(uCurrentIter);
+
+            if (converged)
+                return;
+
+            else if (!converged && i < maxTimeStepDivisions_)
+            {
+                // set solution to previous solution
+                uCurrentIter = this->assembler().prevSol();
+
+                // reset the grid variables to the previous solution
+                this->assembler().resetTimeStep(uCurrentIter);
+
+                if (verbosity_ >= 1)
+                    std::cout << "Newton solver did not converge with dt = "
+                              << timeLoop.timeStepSize() << " seconds. Retrying with time step of "
+                              << timeLoop.timeStepSize() * retryTimeStepReductionFactor_ << " seconds\n";
+
+                // try again with dt = dt * retryTimeStepReductionFactor_
+                timeLoop.setTimeStepSize(timeLoop.timeStepSize() * retryTimeStepReductionFactor_);
+            }
+
+            else
+            {
+                DUNE_THROW(NumericalProblem, "Newton solver didn't converge after "
+                                             << maxTimeStepDivisions_ << " time-step divisions. dt="
+                                             << timeLoop.timeStepSize() << '\n');
+            }
+        }
+    }
+
+    /*!
+     * \brief Run the Newton method to solve a non-linear system.
+     *        The solver is responsible for all the strategic decisions.
+     */
+    void solve(SolutionVector& uCurrentIter) override
+    {
+        const bool converged = solve_(uCurrentIter);
         if (!converged)
             DUNE_THROW(NumericalProblem, "Newton solver didn't converge after "
                                          << numSteps_ << " iterations.\n");
@@ -217,17 +259,16 @@ public:
      *        non-linear system of equations.
      *
      * \param u The initial solution
-     * \param vars The variables at the initial solution
      */
-    virtual void newtonBegin(SolutionVector& u, Variables& variables)
+    virtual void newtonBegin(SolutionVector& u)
     {
         numSteps_ = 0;
-        initPriVarSwitch_(u, variables, HasPriVarsSwitch{});
+        initPriVarSwitch_(u, HasPriVarsSwitch{});
 
         // write the initial residual if a convergence writer was set
         if (convergenceWriter_)
         {
-            this->assembler().assembleResidual(variables);
+            this->assembler().assembleResidual(u);
             SolutionVector delta(u);
             delta = 0; // dummy vector, there is no delta before solving the linear system
             convergenceWriter_->write(u, delta, this->assembler().residual());
@@ -285,11 +326,11 @@ public:
     /*!
      * \brief Assemble the linear system of equations \f$\mathbf{A}x - b = 0\f$.
      *
-     * \param curVariables The state of the variables at the current iteration
+     * \param uCurrentIter The current iteration's solution vector
      */
-    virtual void assembleLinearSystem(const Variables& curVariables)
+    virtual void assembleLinearSystem(const SolutionVector& uCurrentIter)
     {
-        assembleLinearSystem_(this->assembler(), curVariables);
+        assembleLinearSystem_(this->assembler(), uCurrentIter);
 
         if (enablePartialReassembly_)
             partialReassembler_->report(comm_, endIterMsgStream_);
@@ -365,14 +406,12 @@ public:
      * \f[ u^{k+1} = u^k - \Delta u^k \f]
      *
      * \param uCurrentIter The solution vector after the current iteration
-     * \param varsCurrentIter The variables state (to be updated to the new iterate)
      * \param uLastIter The solution vector after the last iteration
      * \param deltaU The delta as calculated from solving the linear
      *               system of equations. This parameter also stores
      *               the updated solution.
      */
     void newtonUpdate(SolutionVector &uCurrentIter,
-                      Variables& varsCurrentIter,
                       const SolutionVector &uLastIter,
                       const SolutionVector &deltaU)
     {
@@ -415,22 +454,26 @@ public:
         }
 
         if (useLineSearch_)
-            lineSearchUpdate_(uCurrentIter, varsCurrentIter, uLastIter, deltaU);
+            lineSearchUpdate_(uCurrentIter, uLastIter, deltaU);
 
         else if (useChop_)
-            choppedUpdate_(uCurrentIter, varsCurrentIter, uLastIter, deltaU);
+            choppedUpdate_(uCurrentIter, uLastIter, deltaU);
 
         else
         {
             uCurrentIter = uLastIter;
             uCurrentIter -= deltaU;
 
-            // update the variables to the new iterate
-            // TODO: This is not so nice (see comment in assembler)
-            this->assembler().update(varsCurrentIter, uCurrentIter);
-
             if (enableResidualCriterion_)
-                computeResidualReduction_(varsCurrentIter);
+                computeResidualReduction_(uCurrentIter);
+
+            else
+            {
+                // If we get here, the convergence criterion does not require
+                // additional residual evaluations. Thus, the grid variables have
+                // not yet been updated to the new uCurrentIter.
+                this->assembler().updateGridVariables(uCurrentIter);
+            }
         }
     }
 
@@ -438,14 +481,12 @@ public:
      * \brief Indicates that one Newton iteration was finished.
      *
      * \param uCurrentIter The solution after the current Newton iteration
-     * \param varsCurrentIter The variables at the current iterate
      * \param uLastIter The solution at the beginning of the current Newton iteration
      */
     virtual void newtonEndStep(SolutionVector &uCurrentIter,
-                               Variables& varsCurrentIter,
                                const SolutionVector &uLastIter)
     {
-        invokePriVarSwitch_(uCurrentIter, varsCurrentIter, HasPriVarsSwitch{});
+        invokePriVarSwitch_(uCurrentIter, HasPriVarsSwitch{});
 
         ++numSteps_;
 
@@ -663,9 +704,9 @@ public:
 
 protected:
 
-    void computeResidualReduction_(const Variables& varsCurrentIter)
+    void computeResidualReduction_(const SolutionVector &uCurrentIter)
     {
-        residualNorm_ = this->assembler().residualNorm(varsCurrentIter);
+        residualNorm_ = this->assembler().residualNorm(uCurrentIter);
         reduction_ = residualNorm_;
         reduction_ /= initialResidual_;
     }
@@ -676,41 +717,40 @@ protected:
     /*!
      * \brief Initialize the privar switch, noop if there is no priVarSwitch
      */
-    void initPriVarSwitch_(SolutionVector&, Variables&, std::false_type) {}
+    void initPriVarSwitch_(SolutionVector&, std::false_type) {}
 
     /*!
      * \brief Initialize the privar switch
      */
-    void initPriVarSwitch_(SolutionVector& sol, Variables& vars, std::true_type)
+    void initPriVarSwitch_(SolutionVector& sol, std::true_type)
     {
         priVarSwitch_->reset(sol.size());
         priVarsSwitchedInLastIteration_ = false;
 
-        // we assume grid-based schemes to be used in the context of switchable
-        // primary variables. Therefore, we require a problem and geometry.
-        const auto& problem = vars.problem();
-        const auto& gridGeometry = vars.gridGeometry();
-        priVarSwitch_->updateBoundary(problem, gridGeometry, vars, sol);
+        const auto& problem = this->assembler().problem();
+        const auto& gridGeometry = this->assembler().gridGeometry();
+        auto& gridVariables = this->assembler().gridVariables();
+        priVarSwitch_->updateBoundary(problem, gridGeometry, gridVariables, sol);
     }
 
     /*!
      * \brief Switch primary variables if necessary, noop if there is no priVarSwitch
      */
-    void invokePriVarSwitch_(SolutionVector&, Variables&, std::false_type) {}
+    void invokePriVarSwitch_(SolutionVector&, std::false_type) {}
 
     /*!
      * \brief Switch primary variables if necessary
      */
-    void invokePriVarSwitch_(SolutionVector& uCurrentIter, Variables& varsCurrentIter, std::true_type)
+    void invokePriVarSwitch_(SolutionVector& uCurrentIter, std::true_type)
     {
         // update the variable switch (returns true if the pri vars at at least one dof were switched)
-        // for disabled grid variable caching. Primary variables switching only works for grid-based schemes
-        // so far, which is why at this point we require problem&geometry to be extractable from the variables
-        const auto& gridGeometry = varsCurrentIter.gridGeometry();
-        const auto& problem = varsCurrentIter.problem();
+        // for disabled grid variable caching
+        const auto& gridGeometry = this->assembler().gridGeometry();
+        const auto& problem = this->assembler().problem();
+        auto& gridVariables = this->assembler().gridVariables();
 
         // invoke the primary variable switch
-        priVarsSwitchedInLastIteration_ = priVarSwitch_->update(uCurrentIter, varsCurrentIter,
+        priVarsSwitchedInLastIteration_ = priVarSwitch_->update(uCurrentIter, gridVariables,
                                                                 problem, gridGeometry);
 
         if (priVarsSwitchedInLastIteration_)
@@ -718,10 +758,10 @@ protected:
             for (const auto& element : elements(gridGeometry.gridView()))
             {
                 // if the volume variables are cached globally, we need to update those where the primary variables have been switched
-                priVarSwitch_->updateSwitchedVolVars(problem, element, gridGeometry, varsCurrentIter, uCurrentIter);
+                priVarSwitch_->updateSwitchedVolVars(problem, element, gridGeometry, gridVariables, uCurrentIter);
 
                 // if the flux variables are cached globally, we need to update those where the primary variables have been switched
-                priVarSwitch_->updateSwitchedFluxVarsCache(problem, element, gridGeometry, varsCurrentIter, uCurrentIter);
+                priVarSwitch_->updateSwitchedFluxVarsCache(problem, element, gridGeometry, gridVariables, uCurrentIter);
             }
         }
     }
@@ -754,16 +794,13 @@ private:
     /*!
      * \brief Run the Newton method to solve a non-linear system.
      *        The solver is responsible for all the strategic decisions.
-     * \param uCurrentIter The solution at the current iteration
-     * \param varsCurrentIter The variables at the current iteration
      */
-    bool solve_(SolutionVector& uCurrentIter,
-                Variables& varsCurrentIter)
+    bool solve_(SolutionVector& uCurrentIter)
     {
         try
         {
             // newtonBegin may manipulate the solution
-            newtonBegin(uCurrentIter, varsCurrentIter);
+            newtonBegin(uCurrentIter);
 
             // the given solution is the initial guess
             SolutionVector uLastIter(uCurrentIter);
@@ -797,7 +834,7 @@ private:
 
                 // linearize the problem at the current solution
                 assembleTimer.start();
-                assembleLinearSystem(varsCurrentIter);
+                assembleLinearSystem(uCurrentIter);
                 assembleTimer.stop();
 
                 ///////////////
@@ -832,16 +869,16 @@ private:
                 updateTimer.start();
                 // update the current solution (i.e. uOld) with the delta
                 // (i.e. u). The result is stored in u
-                newtonUpdate(uCurrentIter, varsCurrentIter, uLastIter, deltaU);
+                newtonUpdate(uCurrentIter, uLastIter, deltaU);
                 updateTimer.stop();
 
                 // tell the solver that we're done with this iteration
-                newtonEndStep(uCurrentIter, varsCurrentIter, uLastIter);
+                newtonEndStep(uCurrentIter, uLastIter);
 
                 // if a convergence writer was specified compute residual and write output
                 if (convergenceWriter_)
                 {
-                    this->assembler().assembleResidual(varsCurrentIter);
+                    this->assembler().assembleResidual(uCurrentIter);
                     convergenceWriter_->write(uCurrentIter, deltaU, this->assembler().residual());
                 }
 
@@ -890,18 +927,18 @@ private:
 
     //! assembleLinearSystem_ for assemblers that support partial reassembly
     template<class A>
-    auto assembleLinearSystem_(const A& assembler, const Variables& curVariables)
+    auto assembleLinearSystem_(const A& assembler, const SolutionVector& uCurrentIter)
     -> typename std::enable_if_t<decltype(isValid(Detail::supportsPartialReassembly())(assembler))::value, void>
     {
-        this->assembler().assembleJacobianAndResidual(curVariables, partialReassembler_.get());
+        this->assembler().assembleJacobianAndResidual(uCurrentIter, partialReassembler_.get());
     }
 
     //! assembleLinearSystem_ for assemblers that don't support partial reassembly
     template<class A>
-    auto assembleLinearSystem_(const A& assembler, const Variables& curVariables)
+    auto assembleLinearSystem_(const A& assembler, const SolutionVector& uCurrentIter)
     -> typename std::enable_if_t<!decltype(isValid(Detail::supportsPartialReassembly())(assembler))::value, void>
     {
-        this->assembler().assembleJacobianAndResidual(curVariables);
+        this->assembler().assembleJacobianAndResidual(uCurrentIter);
     }
 
     /*!
@@ -953,7 +990,6 @@ private:
     }
 
     virtual void lineSearchUpdate_(SolutionVector &uCurrentIter,
-                                   Variables& varsCurrentIter,
                                    const SolutionVector &uLastIter,
                                    const SolutionVector &deltaU)
     {
@@ -965,9 +1001,7 @@ private:
             uCurrentIter *= -lambda;
             uCurrentIter += uLastIter;
 
-            // update variables to the new iterate and compute residual reduction
-            this->assembler().update(varsCurrentIter, uCurrentIter);
-            computeResidualReduction_(varsCurrentIter);
+            computeResidualReduction_(uCurrentIter);
 
             if (reduction_ < lastReduction_ || lambda <= 0.125) {
                 endIterMsgStream_ << ", residual reduction " << lastReduction_ << "->"  << reduction_ << "@lambda=" << lambda;
@@ -979,8 +1013,8 @@ private:
         }
     }
 
+    //! \note method must update the gridVariables, too!
     virtual void choppedUpdate_(SolutionVector &uCurrentIter,
-                                Variables& varsCurrentIter,
                                 const SolutionVector &uLastIter,
                                 const SolutionVector &deltaU)
     {

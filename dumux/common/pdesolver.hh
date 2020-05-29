@@ -29,6 +29,8 @@
 
 #include <dune/common/hybridutilities.hh>
 
+#include <dumux/common/timeloop.hh>
+
 // forward declare
 namespace Dune {
 template <class FirstRow, class ... Args>
@@ -45,22 +47,17 @@ namespace Dumux {
  * and has a method solve that linearizes (if not already linear), assembles, solves and updates
  * given an initial solution producing a new solution.
  *
- * \tparam AssemblerType A PDE linearized system assembler
- * \tparam LinearSolverType A linear system solver
+ * \tparam Assembler A PDE linearized system assembler
+ * \tparam LinearSolver A linear system solver
  */
-template<class AssemblerType, class LinearSolverType>
+template<class Assembler, class LinearSolver>
 class PDESolver
 {
-    using SolutionVector = typename AssemblerType::ResidualType;
-    using Variables = typename AssemblerType::Variables;
-    using Scalar = typename AssemblerType::Scalar;
+    using SolutionVector = typename Assembler::ResidualType;
+    using Scalar = typename Assembler::Scalar;
+    using TimeLoop = TimeLoopBase<Scalar>;
 
 public:
-    //! export the underlying types for assembler and linear solver
-    using Assembler = AssemblerType;
-    using LinearSolver = LinearSolverType;
-
-    //! The constructor
     PDESolver(std::shared_ptr<Assembler> assembler,
               std::shared_ptr<LinearSolver> linearSolver)
     : assembler_(assembler)
@@ -72,13 +69,23 @@ public:
     /*!
      * \brief Solve the given PDE system (usually assemble + solve linear system + update)
      * \param sol a solution vector possbilty containing an initial solution
-     * \param vars an instance of the variables object containing all quantities
-     *             required to evaluate the PDE (may be more than just the primary variables)
-     * \note The variables depend on the primary variables. Thus, here we assume that the
-     *       provided solution is the one which has been used to construct the variables object.
      */
-    virtual void solve(SolutionVector& sol, Variables& vars) = 0;
+    virtual void solve(SolutionVector& sol) = 0;
 
+    /*!
+     * \brief Solve the given PDE system with time step control
+     * \note This is used for solvers that are allowed to e.g. automatically reduce the
+     *       time step if the solve was not successful
+     * \param sol a solution vector possbilty containing an initial solution
+     * \param timeLoop a reference to the current time loop
+     */
+    virtual void solve(SolutionVector& sol, TimeLoop& timeLoop)
+    {
+        // per default we just forward to the method without time step control
+        solve(sol);
+    }
+
+protected:
     /*!
      * \brief Access the assembler
      */
@@ -102,8 +109,6 @@ public:
      */
     LinearSolver& linearSolver()
     { return *linearSolver_; }
-
-protected:
 
     /*!
      * \brief Helper function to assure the MultiTypeBlockMatrix's sub-blocks have the correct sizes.
