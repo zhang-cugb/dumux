@@ -291,6 +291,40 @@ private:
 
     /*!
      * \brief Returns an array of momenta needed for higher order or calls a function to return an array for basic upwinding methods.
+     *
+     * ------------
+     * |     xxxx o
+     * |     xxxx o
+     * |     xxxx o
+     * -----------*bbbbbbbbbbb
+     * |     yyyy o zzzz     |
+     * |     yyyy o zzzz     |
+     * |     yyyy o zzzz     |
+     * -----------------------
+     * If ownScvf is touching a corner, at which there is a Dirichlet condition for face b (half-control
+     * volumes x, y and z), the transported velocity at * exists and is taken. No upwinding or
+     * higher-order approximation for the velocity at * are required. This also means the transported
+     * velocity at * is the same for the half-control volumes y and z.
+     *
+     * ------------
+     * |          |
+     * |          |
+     * |          |
+     * -----------------------
+     * |     xxxx o wwww     |
+     * |     xxxx o wwww     |
+     * |     xxxx o wwww     |
+     * ------+++++*~~~~~------
+     * |     yyyy o zzzz     |
+     * |     yyyy o zzzz     |
+     * |     yyyy o zzzz     |
+     * -----------------------
+     * If the flux over face + is calculated and a corner occurs a bit further away (here upper right),
+     * no special treatment of the corner geometry is provided. This means, the transported velocity at
+     * star (*) is gotten from an upwinding/a high order approximation. In particularly, this also means
+     * that while x and y see the same velocity * for the flux over face x (continuity OK), z sees
+     * another velocity * for the flux over face ~ (continuity still OK, as only z and w have to use the
+     * same velocity at *).
      */
     static auto getLateralUpwindingMomenta_(const Problem& problem,
                                             const FVElementGeometry& fvGeometry,
@@ -320,13 +354,29 @@ private:
             {
                 // If the lateral face lies on a boundary, we assume that the parallel velocity on the boundary is actually known,
                 // thus we always use this value for the computation of the transported momentum.
-                if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
+                if ((!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0)) || ownScvf.hasHalfParallelNeighbor(localSubFaceIdx) || ownScvf.hasCornerParallelNeighbor(localSubFaceIdx))
                 {
-                    const Scalar boundaryMomentum = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
-                                                                                    faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
-                                                                                    localSubFaceIdx) * insideVolVars.density();
+                    bool hasDirichletHalfParallelNeighbor = false;
+                    bool hasDirichletCornerParallelNeighbor = false;
 
-                    return std::array<Scalar, 3>{boundaryMomentum, boundaryMomentum, boundaryMomentum};
+                    setHasDirichletHalfOrCornerParallelNeighbor_(problem, fvGeometry, ownScvf, localSubFaceIdx, hasDirichletHalfParallelNeighbor, hasDirichletCornerParallelNeighbor);
+
+                    Scalar boundaryMomentum;
+
+                    if (hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
+                    {
+                        boundaryMomentum = getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * insideVolVars.density();
+
+                        return std::array<Scalar, 3>{boundaryMomentum, boundaryMomentum, boundaryMomentum};
+                    }
+                    else if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
+                    {
+                        boundaryMomentum = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
+                                                         faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
+                                                         localSubFaceIdx) * insideVolVars.density();
+
+                        return std::array<Scalar, 3>{boundaryMomentum, boundaryMomentum, boundaryMomentum};
+                    }
                 }
 
                 std::array<Scalar, 3> momenta;
@@ -398,14 +448,26 @@ private:
                                                       const VolumeVariables& insideVolVars,
                                                       const VolumeVariables& outsideVolVars)
     {
-        const Scalar momentumParallel = ownScvf.hasParallelNeighbor(localSubFaceIdx, 0)
-                                      ? faceVars.velocityParallel(localSubFaceIdx, 0) * outsideVolVars.density()
-                                      : (getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
+        Scalar momentumParallel;
+
+        bool hasDirichletHalfParallelNeighbor = false;
+        bool hasDirichletCornerParallelNeighbor = false;
+
+        setHasDirichletHalfOrCornerParallelNeighbor_(problem, fvGeometry, ownScvf, localSubFaceIdx, hasDirichletHalfParallelNeighbor, hasDirichletCornerParallelNeighbor);
+
+        if (hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
+        {
+            momentumParallel = getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * outsideVolVars.density();
+        }
+        else if (ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
+            momentumParallel = faceVars.velocityParallel(localSubFaceIdx, 0) * outsideVolVars.density();
+        else
+            momentumParallel = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
                                                                           faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
-                                                                          localSubFaceIdx) * insideVolVars.density());
+                                                                          localSubFaceIdx) * insideVolVars.density();
         // If the lateral face lies on a boundary, we assume that the parallel velocity on the boundary is actually known,
         // thus we always use this value for the computation of the transported momentum.
-        if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
+        if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0) || hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
         {
             if constexpr (useHigherOrder)
                 return std::array<Scalar, 3>{momentumParallel, momentumParallel};
@@ -600,6 +662,148 @@ private:
                                                 faceVars, currentScvfBoundaryTypes, lateralOppositeFaceBoundaryTypes,
                                                 localOppositeSubFaceIdx);
     }
+
+    /*!
+     * \brief Returns the boundary subcontrolvolumeface in a corner geometry.
+     *
+     * ------------
+     * |     xxxx o
+     * |     xxxx o
+     * |     xxxx o
+     * ------------bbbbbbbbbbb
+     * |     yyyy o          |
+     * |     yyyy o          |
+     * |     yyyy o          |
+     * -----------------------
+     *
+     * This function will be entered in such a corner geometry (there is no cell in the upper right, --- and | stand for the grid cells). The ownScvf will be one of the two ones denoted by o (upper one hasCornerParallelNeighbor, lower one hasHalfParallelNeighbor). x and y are the two possible corresponding half-control volumes. In both cases, the returned boudnaryScvf is the one marked by b. It needs to be the same boundaryScvf returned for the sake of flux continuity.
+    */
+    static SubControlVolumeFace boundaryScvf_(const FVElementGeometry& fvGeometry,
+                                               const SubControlVolumeFace& ownScvf,
+                                               const int localSubFaceIdx)
+    {
+        if (ownScvf.hasHalfParallelNeighbor(localSubFaceIdx))
+        {
+            return fvGeometry.scvf(ownScvf.outsideScvIdx(), ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx);
+        }
+        else //ownScvf.hasCornerParallelNeighbor(localSubFaceIdx))
+        {
+//      ------------
+//      | xxxxxxxx o
+//      | xxxxxxxx o
+//      | xxxxxxxx o
+//      lllllllllll-bbbbbbbbbbb
+//      | yyyyyyyy p          |
+//      | yyyyyyyy p          |
+//      | yyyyyyyy p          |
+//      -----------------------
+//
+//      o: ownScvf, l: lateralFace, p: parallelFace, b: returned scvf, x: ownScvf inside scv, y: lateralFace outside scv
+            const SubControlVolumeFace& lateralFace = fvGeometry.scvf(ownScvf.insideScvIdx(), ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx);
+            const SubControlVolumeFace& parallelFace = fvGeometry.scvf(lateralFace.outsideScvIdx(), ownScvf.localFaceIdx());
+
+            const auto& localLateralIdx = ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx;
+            const auto& localLateralOppositeIdx =  (localLateralIdx % 2) ? (localLateralIdx - 1) : (localLateralIdx + 1);
+
+            return fvGeometry.scvf(parallelFace.outsideScvIdx(), localLateralOppositeIdx);
+        }
+    }
+
+   /*!
+    * \brief Gets the boundary element in a corner geometry.
+    *
+    * ------------
+    * |     xxxx o
+    * |     xxxx o
+    * |     xxxx o
+    * -----------------------
+    * |     yyyy o bbbbbbbb |
+    * |     yyyy o bbbbbbbb |
+    * |     yyyy o bbbbbbbb |
+    * -----------------------
+    *
+    * This function will be entered in such a corner geometry (there is no cell in the upper right, --- and | stand for the grid cells). The ownScvf will be one of the two ones denoted by o (upper one hasCornerParallelNeighbor, lower one hasHalfParallelNeighbor). x and y are the two possible corresponding half-control volumes. In both cases, the returned boudnaryElement is the one marked by b.  It needs to be the same boundaryScvf returned for the sake of flux continuity.
+    */
+    static Element boundaryElement_(const FVElementGeometry& fvGeometry,
+                                    const SubControlVolumeFace& ownScvf,
+                                    const int localSubFaceIdx)
+    {
+        if (ownScvf.hasHalfParallelNeighbor(localSubFaceIdx))
+        {
+            return fvGeometry.gridGeometry().element(ownScvf.outsideScvIdx());
+        }
+        else //ownScvf.hasCornerParallelNeighbor(localSubFaceIdx))
+        {
+            const SubControlVolumeFace& lateralFace = fvGeometry.scvf(ownScvf.insideScvIdx(), ownScvf.pairData(localSubFaceIdx).localLateralFaceIdx);
+            const SubControlVolumeFace& parallelFace = fvGeometry.scvf(lateralFace.outsideScvIdx(), ownScvf.localFaceIdx());
+
+            return fvGeometry.gridGeometry().element(parallelFace.outsideScvIdx());
+        }
+    }
+
+   /*!
+    * \brief Sets the bools hasDirichletCornerParallelNeighbor and hasDirichletHalfParallelNeighbor.
+    *
+    * ------------
+    * |     xxxx o
+    * |     xxxx o
+    * |     xxxx o
+    * ------------bbbbbbbbbbb
+    * |     yyyy o          |
+    * |     yyyy o boundary |
+    * |     yyyy o  element |
+    * -----------------------
+    *
+    * This function will be entered in such a corner geometry (there is no cell in the upper right, --- and | stand for the grid cells). The ownScvf will be one of the two ones denoted by o (upper one hasCornerParallelNeighbor, lower one hasHalfParallelNeighbor). x and y are the two possible corresponding half-control volumes. In both cases, we check if the face bbb, part of the edge of element boudnaryElement, is a Dirichlet boundary.
+    */
+    static void setHasDirichletHalfOrCornerParallelNeighbor_(const Problem& problem,
+                                                             const FVElementGeometry& fvGeometry,
+                                                             const SubControlVolumeFace& ownScvf,
+                                                             const int localSubFaceIdx,
+                                                             bool& hasDirichletHalfParallelNeighbor,
+                                                             bool& hasDirichletCornerParallelNeighbor)
+    {
+        if (ownScvf.hasHalfParallelNeighbor(localSubFaceIdx) || ownScvf.hasCornerParallelNeighbor(localSubFaceIdx))
+        {
+            const Element& boundaryElement = boundaryElement_(fvGeometry, ownScvf, localSubFaceIdx);
+            const SubControlVolumeFace& boundaryScvf = boundaryScvf_(fvGeometry, ownScvf, localSubFaceIdx);
+
+            bool setValue = problem.boundaryTypes(boundaryElement, boundaryScvf).isDirichlet(Indices::velocity(ownScvf.directionIndex()));
+
+            if (ownScvf.hasHalfParallelNeighbor(localSubFaceIdx))
+                hasDirichletHalfParallelNeighbor = setValue;
+            else
+                hasDirichletCornerParallelNeighbor = setValue;
+        }
+    }
+
+   /*!
+    * \brief Gets the parallel velocity from a corner geometry.
+    *
+    * ------------
+    * |     xxxx o
+    * |     xxxx o
+    * |     xxxx o
+    * -----------*-----------
+    * |     yyyy o          |
+    * |     yyyy o          |
+    * |     yyyy o          |
+    * -----------------------
+    *
+    * This function will be entered in such a corner geometry (there is no cell in the upper right, --- and | stand for the grid cells). The ownScvf will be one of the two ones denoted by o (upper one hasCornerParallelNeighbor, lower one hasHalfParallelNeighbor). x and y are the two possible corresponding half-control volumes. In both cases, the returned velocity is situated in the corner (*).
+    */
+    static Scalar getParallelVelocityFromCorner_(const Problem& problem,
+                                                          const FVElementGeometry& fvGeometry,
+                                                          const SubControlVolumeFace& ownScvf,
+                                                          const int localSubFaceIdx)
+    {
+        const Element& boundaryElement = boundaryElement_(fvGeometry,ownScvf,localSubFaceIdx);
+        const SubControlVolumeFace& boundaryScvf = boundaryScvf_(fvGeometry,ownScvf,localSubFaceIdx);
+        const auto ghostFace = boundaryScvf.makeBoundaryFace(ownScvf.pairData(localSubFaceIdx).lateralStaggeredFaceCenter);
+
+        return problem.dirichlet(boundaryElement, ghostFace)[Indices::velocity(ownScvf.directionIndex())];
+    }
+
 };
 
 } // end namespace Dumux

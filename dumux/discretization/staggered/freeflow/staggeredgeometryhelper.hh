@@ -42,6 +42,31 @@ namespace Detail {
 /*!
  * \ingroup StaggeredDiscretization
  * \brief Parallel Data stored per sub face
+ *
+ * ------------
+ * |          |
+ * |          |
+ * |          |
+ * -----------------------
+ * | yyyyyyyy s          |
+ * | yyyyyyyy s          |
+ * | yyyyyyyy s          |
+ * -----------------------
+ * In this corner geometry, subcontrolvolumeface s belonging to the element filled by 'y's has a
+ * 'halfParallelNeighbor'. This means it has a parallel neighbor itself, but the subcontrolvolumeface that
+ * has the same dofIndex does not.
+ *
+ * ------------
+ * | yyyyyyyy s
+ * | yyyyyyyy s
+ * | yyyyyyyy s
+ * -----------------------
+ * |          |          |
+ * |          |          |
+ * |          |          |
+ * -----------------------
+ * In this corner geometry, subcontrolvolumeface s belonging to the element filled by 'y's has a
+ * 'cornerParallelNeighbor'.
  */
 template<class GridView, int upwindSchemeOrder>
 struct PairData
@@ -52,6 +77,8 @@ struct PairData
     using SmallLocalIndexType = typename IndexTraits<GridView>::SmallLocalIndex;
 
     std::bitset<upwindSchemeOrder> hasParallelNeighbor;
+    bool hasHalfParallelNeighbor = false;
+    bool hasCornerParallelNeighbor = false;
     std::array<GridIndexType, upwindSchemeOrder> parallelDofs;
     std::array<Scalar, upwindSchemeOrder> parallelCellWidths;
     bool hasOuterLateral = false;
@@ -435,6 +462,55 @@ private:
                     pairData_[numPairParallelIdx].hasParallelNeighbor.set(0, true);
                     pairData_[numPairParallelIdx].parallelDofs[0] = gridView_.indexSet().subIndex(outerElement, parallelLocalIdx, codimIntersection);
                     pairData_[numPairParallelIdx].parallelCellWidths[0] = setParallelPairCellWidths_(outerElement, parallelAxisIdx);
+
+//       ------------
+//       |          |
+//       |          |
+//       |          |
+//       iiiiiiiiiii*bbbbbbbbbbb
+//       |          o zzzzzzzz |
+//       |          o zzzzzzzz |
+//       |          o zzzzzzzz |
+//       -----------------------
+//
+//       i:intersection,o:intersection_, b: outerIntersection, z: intersection_.outside()
+                    if (intersection_.neighbor())
+                    {
+                        for (const auto& outerIntersection : intersections(gridView_, intersection_.outside()))
+                        {
+                            if (intersection.indexInInside() == outerIntersection.indexInInside())
+                            {
+                                if (!outerIntersection.neighbor())
+                                {
+                                    pairData_[numPairParallelIdx].hasHalfParallelNeighbor = true;
+                                }
+                            }
+                        }
+                    }
+//       ------------
+//       |          o
+//       |          o
+//       |          o
+//       iiiiiiiiiii------------
+//       | zzzzzzzz b          |
+//       | zzzzzzzz b          |
+//       | zzzzzzzz b          |
+//       -----------------------
+//
+//       i:intersection,o:intersection_, b: outerIntersection, z: intersection.outside()
+                    if (!intersection_.neighbor())
+                    {
+                        for (const auto& outerIntersection : intersections(gridView_, intersection.outside()))
+                        {
+                            if (intersection_.indexInInside() == outerIntersection.indexInInside())
+                            {
+                                if (outerIntersection.neighbor())
+                                {
+                                    pairData_[numPairParallelIdx].hasCornerParallelNeighbor = true;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 numPairParallelIdx++;
@@ -444,7 +520,8 @@ private:
 
     /*!
      * \brief Fills the pair data with the parallel dofs and distances.
-     *        This function builds and extended stencil and is therefore only called when higher order upwinding methods are prescribed.
+     *        This function builds and extended stencil and is therefore only called when higher order upwinding
+     *        methods are prescribed.
      */
     void fillParallelPairData_(std::true_type)
     {
@@ -492,6 +569,67 @@ private:
                         pairData_[numPairParallelIdx].hasParallelNeighbor.set(i, true);
                         pairData_[numPairParallelIdx].parallelDofs[i] = gridView_.indexSet().subIndex(e, parallelLocalIdx, codimIntersection);
                         pairData_[numPairParallelIdx].parallelCellWidths[i] = setParallelPairCellWidths_(e, parallelAxisIdx);
+
+//       ------------
+//       |          |
+//       |          |
+//       |          |
+//       iiiiiiiiiii*bbbbbbbbbbb
+//       |          o zzzzzzzz |
+//       |          o zzzzzzzz |
+//       |          o zzzzzzzz |
+//       -----------------------
+//
+//       i:intersection,o:intersection_, b: outerIntersection, z: intersection_.outside()
+                        if (i==0 && intersection_.neighbor())
+                        {
+                            for (const auto& outerIntersection : intersections(gridView_, intersection_.outside()))
+                            {
+                                if (intersection.indexInInside() == outerIntersection.indexInInside())
+                                {
+                                    if (!outerIntersection.neighbor())
+                                    {
+                                        pairData_[numPairParallelIdx].hasHalfParallelNeighbor = true;
+                                    }
+                                }
+                            }
+                        }
+
+//       ------------
+//       |          o
+//       |          o
+//       |          o
+//       -----------------------
+//       |          |          |
+//       |          |          |
+//       |          |          |
+//       -----------------------
+//
+//       o:intersection_
+//       ------------
+//       |          o
+//       |          o
+//       |          o
+//       iiiiiiiiiii------------
+//       | zzzzzzzz b          |
+//       | zzzzzzzz b          |
+//       | zzzzzzzz b          |
+//       -----------------------
+//
+//       i:intersection,o:intersection_, b: outerIntersection, z: intersection.outside()
+                        if (i==0 && !intersection_.neighbor())
+                        {
+                            for (const auto& outerIntersection : intersections(gridView_, intersection.outside()))
+                            {
+                                if (intersection_.indexInInside() == outerIntersection.indexInInside())
+                                {
+                                    if (outerIntersection.neighbor())
+                                    {
+                                        pairData_[numPairParallelIdx].hasCornerParallelNeighbor = true;
+                                    }
+                                }
+                            }
+                        }
                     }
                     else
                     {
