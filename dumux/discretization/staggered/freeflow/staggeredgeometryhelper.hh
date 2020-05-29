@@ -448,58 +448,60 @@ private:
      */
     void fillParallelPairData_(std::true_type)
     {
-        // set basic global positions and stencil size definitions
-        const auto numParallelFaces = pairData_[0].parallelCellWidths.size();
-
         // get the parallel Dofs
         const auto parallelLocalIdx = intersection_.indexInInside();
         SmallLocalIndexType numPairParallelIdx = 0;
-        std::stack<Element> parallelElementStack;
+
         for(const auto& intersection : intersections(gridView_, element_))
         {
             if( facetIsNormal_(intersection.indexInInside(), parallelLocalIdx) )
             {
                 if( intersection.neighbor() )
                 {
-                    auto parallelAxisIdx = directionIndex(intersection);
-                    auto localLateralIntersectionIndex = intersection.indexInInside();
-                    auto e = element_;
-
-                    bool keepStacking =  (parallelElementStack.size() < numParallelFaces);
-                    while(keepStacking)
-                    {
-                        for(const auto& lateralIntersection : intersections(gridView_, e))
-                        {
-                            if( lateralIntersection.indexInInside() == localLateralIntersectionIndex )
-                            {
-                                if( lateralIntersection.neighbor() )
-                                {
-                                    parallelElementStack.push(lateralIntersection.outside());
-                                    keepStacking = (parallelElementStack.size() < numParallelFaces);
-                                }
-                                else
-                                {
-                                    keepStacking = false;
-                                }
-                            }
-                        }
-                        e = parallelElementStack.top();
-                    }
-
-                    while(!parallelElementStack.empty())
-                    {
-                        pairData_[numPairParallelIdx].hasParallelNeighbor.set(parallelElementStack.size()-1, true);
-                        pairData_[numPairParallelIdx].parallelDofs[parallelElementStack.size()-1] = gridView_.indexSet().subIndex(parallelElementStack.top(), parallelLocalIdx, codimIntersection);
-                        pairData_[numPairParallelIdx].parallelCellWidths[parallelElementStack.size()-1] = setParallelPairCellWidths_(parallelElementStack.top(), parallelAxisIdx);
-                        parallelElementStack.pop();
-                    }
-
+                    fillParallelPairDataIndividualPair_(intersection, numPairParallelIdx);
                 }
 
                 numPairParallelIdx++;
             }
         }
     }
+
+    /*!
+     * \brief Fills the parallel dofs and distances for one localSubFaceIdx.
+     *        This function builds and extended stencil and is therefore only called when higher order upwinding *        methods are prescribed.
+     */
+    void fillParallelPairDataIndividualPair_(const Intersection& intersection, int numPairParallelIdx)
+    {
+        // set basic global positions and stencil size definitions
+        const auto numParallelFaces = pairData_[0].parallelCellWidths.size();
+
+        const auto parallelLocalIdx = intersection_.indexInInside();
+        auto parallelAxisIdx = directionIndex(intersection);
+        auto localLateralIntersectionIndex = intersection.indexInInside();
+        auto e = element_;
+
+        for (unsigned int i = 0; i < numParallelFaces; ++i)
+        {
+            for(const auto& lateralIntersection : intersections(gridView_, e))
+            {
+                if( lateralIntersection.indexInInside() == localLateralIntersectionIndex )
+                {
+                    if( lateralIntersection.neighbor() )
+                    {
+                        e = lateralIntersection.outside();
+                        pairData_[numPairParallelIdx].hasParallelNeighbor.set(i, true);
+                        pairData_[numPairParallelIdx].parallelDofs[i] = gridView_.indexSet().subIndex(e, parallelLocalIdx, codimIntersection);
+                        pairData_[numPairParallelIdx].parallelCellWidths[i] = setParallelPairCellWidths_(e, parallelAxisIdx);
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
 
     /*!
      * \brief Returns the local opposing intersection index
