@@ -361,17 +361,15 @@ private:
 
                     setHasDirichletHalfOrCornerParallelNeighbor_(problem, fvGeometry, ownScvf, localSubFaceIdx, hasDirichletHalfParallelNeighbor, hasDirichletCornerParallelNeighbor);
 
-                    Scalar boundaryMomentum;
-
                     if (hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
                     {
-                        boundaryMomentum = getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * insideVolVars.density();
+                        const Scalar boundaryMomentum = getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * insideVolVars.density();
 
                         return std::array<Scalar, 3>{boundaryMomentum, boundaryMomentum, boundaryMomentum};
                     }
                     else if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
                     {
-                        boundaryMomentum = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
+                        const Scalar boundaryMomentum = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
                                                          faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
                                                          localSubFaceIdx) * insideVolVars.density();
 
@@ -448,23 +446,13 @@ private:
                                                       const VolumeVariables& insideVolVars,
                                                       const VolumeVariables& outsideVolVars)
     {
-        Scalar momentumParallel;
-
         bool hasDirichletHalfParallelNeighbor = false;
         bool hasDirichletCornerParallelNeighbor = false;
 
         setHasDirichletHalfOrCornerParallelNeighbor_(problem, fvGeometry, ownScvf, localSubFaceIdx, hasDirichletHalfParallelNeighbor, hasDirichletCornerParallelNeighbor);
 
-        if (hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
-        {
-            momentumParallel = getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * outsideVolVars.density();
-        }
-        else if (ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
-            momentumParallel = faceVars.velocityParallel(localSubFaceIdx, 0) * outsideVolVars.density();
-        else
-            momentumParallel = getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
-                                                                          faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
-                                                                          localSubFaceIdx) * insideVolVars.density();
+        const Scalar momentumParallel = firstOrderLateralUpwindingMomentaMomentumParallel_(hasDirichletHalfParallelNeighbor, hasDirichletCornerParallelNeighbor, problem, element, fvGeometry, ownScvf, faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes, localSubFaceIdx, insideVolVars, outsideVolVars);
+
         // If the lateral face lies on a boundary, we assume that the parallel velocity on the boundary is actually known,
         // thus we always use this value for the computation of the transported momentum.
         if (!ownScvf.hasParallelNeighbor(localSubFaceIdx, 0) || hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
@@ -483,6 +471,32 @@ private:
             return selfIsUpstream ? std::array<Scalar, 2>{momentumParallel, momentumSelf}
                                   : std::array<Scalar, 2>{momentumSelf, momentumParallel};
 
+    }
+
+    /*!
+     * \brief Returns an parallel momentum needed for basic upwinding methods.
+     */
+    static Scalar firstOrderLateralUpwindingMomentaMomentumParallel_(bool hasDirichletHalfParallelNeighbor,
+                                                            bool hasDirichletCornerParallelNeighbor,
+                                                            const Problem& problem,
+                                                            const Element& element,
+                                                            const FVElementGeometry& fvGeometry,
+                                                            const SubControlVolumeFace& ownScvf,
+                                                            const FaceVariables& faceVars,
+                                                            const std::optional<BoundaryTypes>& currentScvfBoundaryTypes,
+                                                            const std::optional<BoundaryTypes>& lateralFaceBoundaryTypes,
+                                                            const int localSubFaceIdx,
+                                                            const VolumeVariables& insideVolVars,
+                                                            const VolumeVariables& outsideVolVars)
+    {
+        if (hasDirichletHalfParallelNeighbor || hasDirichletCornerParallelNeighbor)
+            return getParallelVelocityFromCorner_(problem, fvGeometry, ownScvf, localSubFaceIdx) * outsideVolVars.density();
+        else if (ownScvf.hasParallelNeighbor(localSubFaceIdx, 0))
+           return faceVars.velocityParallel(localSubFaceIdx, 0) * outsideVolVars.density();
+        else
+            return getParallelVelocityFromBoundary_(problem, element, fvGeometry, ownScvf,
+                                                                          faceVars, currentScvfBoundaryTypes, lateralFaceBoundaryTypes,
+                                                                          localSubFaceIdx) * insideVolVars.density();
     }
 
     /*!

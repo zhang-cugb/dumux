@@ -553,8 +553,8 @@ private:
         const auto numParallelFaces = pairData_[0].parallelCellWidths.size();
 
         const auto parallelLocalIdx = intersection_.indexInInside();
-        auto parallelAxisIdx = directionIndex(intersection);
-        auto localLateralIntersectionIndex = intersection.indexInInside();
+        const auto parallelAxisIdx = directionIndex(intersection);
+        const auto localLateralIntersectionIndex = intersection.indexInInside();
         auto e = element_;
 
         for (unsigned int i = 0; i < numParallelFaces; ++i)
