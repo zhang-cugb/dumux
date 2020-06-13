@@ -74,8 +74,8 @@ public:
 
     /*!
      * \brief Create vectors containing polar coordinates of all points.
-     *
-     * The following keys are expected to be in group GridParameterGroup:
+     * All keys are expected to be in group GridParameterGroup.
+     * The following keys are recognized:
      * - Radial : min/max value for radial coordinate
      * - Angular : min/max value for angular coordinate
      * - Axial : min/max value for axial coordinate
@@ -84,15 +84,13 @@ public:
      * - Cells : number of cells array for x-coordinate (Again, an added 0, 1 or 3 specifies x, y or z
      * - Grading : grading factor array for x-coordinate (Same here)
      * - Verbosity : whether the grid construction should output to standard out
-     *
+     *-  CakeHeight : the height of the cake grid (in z-direction), its standard value is 1.
      * The grading factor \f$ g \f$ specifies the ratio between the next and the current cell size:
      * \f$ g = \frac{h_{i+1}}{h_i} \f$.
      * Negative grading factors are converted to
      * \f$ g = -\frac{1}{g_\textrm{negative}} \f$
      * to avoid issues with imprecise fraction numbers.
      *
-     * The following parameter is optional:
-     * - CakeGridHeight : the height of the cake grid (in z-direction), if not defined, the height is 1.
      */
     static void createVectors(std::array<std::vector<Scalar>, dim> &polarCoordinates,
                               Dune::FieldVector<int, dim> &indices,
@@ -299,11 +297,7 @@ public:
         // create nodes
         if (dim == 3)
         {
-            const bool hasCakeHeight = hasParamInGroup(modelParamGroup, "Grid.CakeHeight");
-            if (hasCakeHeight)
-            {
-                cakeHeight_= getParamFromGroup<Scalar>(modelParamGroup, "Grid.CakeHeight");
-            }
+            cakeHeight_ = getParamFromGroup<Scalar>(modelParamGroup, "Grid.CakeHeight", 1.0);
             constexpr auto prismType = Dune::GeometryTypes::prism;
             std::vector<Scalar> dZ = polarCoordinates[2];
             for (int j = 0; j <= maxdA; ++j)
@@ -574,7 +568,7 @@ protected:
 
 private:
     GridPointer cakeGrid_;
-    Scalar cakeHeight_ = 1; // standard height of CakgeGrid is 1.
+    Scalar cakeHeight_;
 };
 
 } // end namespace Dumux
