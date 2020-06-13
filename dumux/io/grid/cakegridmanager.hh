@@ -75,8 +75,7 @@ public:
     /*!
      * \brief Create vectors containing polar coordinates of all points.
      *
-     * All keys are expected to be in group GridParameterGroup.
-     * The following keys are recognized:
+     * The following keys are expected to be in group GridParameterGroup:
      * - Radial : min/max value for radial coordinate
      * - Angular : min/max value for angular coordinate
      * - Axial : min/max value for axial coordinate
@@ -91,6 +90,9 @@ public:
      * Negative grading factors are converted to
      * \f$ g = -\frac{1}{g_\textrm{negative}} \f$
      * to avoid issues with imprecise fraction numbers.
+     *
+     * The following parameter is optional:
+     * - CakeGridHeight : the height of the cake grid (in z-direction), if not defined, the height is 1.
      */
     static void createVectors(std::array<std::vector<Scalar>, dim> &polarCoordinates,
                               Dune::FieldVector<int, dim> &indices,
