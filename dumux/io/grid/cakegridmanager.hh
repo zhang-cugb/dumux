@@ -297,6 +297,11 @@ public:
         // create nodes
         if (dim == 3)
         {
+            const bool hasCakeHeight = hasParamInGroup(modelParamGroup, "Grid.CakeHeight");
+            if (hasCakeHeight)
+            {
+                cakeHeight_= getParamFromGroup<Scalar>(modelParamGroup, "Grid.CakeHeight");
+            }
             constexpr auto prismType = Dune::GeometryTypes::prism;
             std::vector<Scalar> dZ = polarCoordinates[2];
             for (int j = 0; j <= maxdA; ++j)
@@ -309,7 +314,7 @@ public:
                         using std::cos;
                         using std::sin;
                         Dune::FieldVector <double, dim> v(0.0);
-                        v[indices[2]] = dZ[l];
+                        v[indices[2]] = cakeHeight_*dZ[l];
                         v[indices[0]] = cos(dA[j])*dR[i];
                         v[indices[1]] = sin(dA[j])*dR[i];
                         if (verbose)
@@ -567,6 +572,7 @@ protected:
 
 private:
     GridPointer cakeGrid_;
+    Scalar cakeHeight_ = 1; // standard height of CakgeGrid is 1.
 };
 
 } // end namespace Dumux
