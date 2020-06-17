@@ -126,7 +126,7 @@ public:
     PrimaryVariables dirichlet(const Element& element,
                                const SubEntity& subEntity,
                                const TimeLevel& timeLevel) const
-    { return {exactSolution(timeLevel.currentTime())}; }
+    { return {exactSolution(timeLevel.current())}; }
 
     // \}
 
@@ -155,7 +155,7 @@ public:
     {
         // we solve du/dt = e^t
         using std::exp;
-        return {exp(gridVarsLocalView.gridVariables().timeLevel().currentTime())};
+        return {exp(gridVarsLocalView.gridVariables().timeLevel().current())};
     }
 
     // \}

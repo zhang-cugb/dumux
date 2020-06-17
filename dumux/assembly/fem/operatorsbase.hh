@@ -35,11 +35,11 @@ namespace Dumux {
  * \todo TODO: This currently assumes Standard Galerkin type fem schemes as
  *             well as non-composite function space bases. Can we generalize this?
  */
-template<class GridVarsLocalView>
+template<class ElementVariables>
 class FEOperatorsBase
 {
     // The variables required for the evaluation of the equation
-    using GridVariables = typename GridVarsLocalView::GridVariables;
+    using GridVariables = typename ElementVariables::GridVariables;
     using IpVariables = typename GridVariables::IntegrationPointVariables;
     using PrimaryVariables = typename GridVariables::PrimaryVariables;
     using Scalar = typename PrimaryVariables::value_type;
@@ -71,10 +71,10 @@ public:
      */
     FEOperatorsBase(const Element& element,
                     const FEElementGeometry& feGeometry,
-                    const GridVarsLocalView& gridVarsLocalView)
-    : element_(&element)
-    , feGeometry_(&feGeometry)
-    , gridVarsLocalView_(&gridVarsLocalView)
+                    const ElementVariables& gridVarsLocalView)
+    : element_(element)
+    , feGeometry_(feGeometry)
+    , elemVariables_(gridVarsLocalView)
     {}
 
     /*!
@@ -109,10 +109,10 @@ public:
         // some references for convenience
         const auto& e = element();
         const auto& fg = feGeometry();
-        const auto& gv = gridVariablesLocalView();
+        const auto& ev = elemVariables();
 
         // add contributions from volume flux sources
-        source += problem_().source(e, fg, gv, ipData, ipVars);
+        source += problem_().source(e, fg, ev, ipData, ipVars);
 
         // TODO: add contribution from possible point sources
 
@@ -138,19 +138,19 @@ public:
      * \brief Return a reference to the underlying grid element
      */
     const Element& element() const
-    { return *element_; }
+    { return element_; }
 
     /*!
      * \brief Return the local view on the grid geometry
      */
     const FEElementGeometry& feGeometry() const
-    { return *feGeometry_; }
+    { return feGeometry_; }
 
     /*!
-     * \brief Return reference to the grid variables
+     * \brief Return reference to the element variables
      */
-    const GridVarsLocalView& gridVariablesLocalView() const
-    { return *gridVarsLocalView_; }
+    const ElementVariables& elemVariables() const
+    { return elemVariables_; }
 
     // \}
 
@@ -158,13 +158,13 @@ protected:
 
     //! return reference to the underlying problem
     const Problem& problem_() const
-    { return gridVariablesLocalView().gridVariables().problem(); }
+    { return elemVariables().gridVariables().problem(); }
 
 private:
 
-    const Element* element_;                     //!< pointer to the element for which the residual is computed
-    const FEElementGeometry* feGeometry_;        //!< the local view on the finite element grid geometry
-    const GridVarsLocalView* gridVarsLocalView_; //!< the local view on the grid variables
+    const Element& element_;                //!< pointer to the element for which the residual is computed
+    const FEElementGeometry& feGeometry_;   //!< the local view on the finite element grid geometry
+    const ElementVariables& elemVariables_; //!< the local view on the grid variables
 };
 
 } // end namespace Dumux

@@ -36,14 +36,14 @@ namespace Dumux {
  * \ingroup TODO: WHICH GROUP?
  * \brief The operators class for a poisson problem
  *        using the finite element method.
- * \tparam GridVarsLocalView The type of local view on the grid variables
+ * \tparam ElementVariables The type of local view on the grid variables
  */
-template<class GridVarsLocalView>
+template<class ElementVariables>
 class FEPoissonOperators
-: public FEOperatorsBase< GridVarsLocalView >
+: public FEOperatorsBase< ElementVariables >
 {
-    using ParentType = FEOperatorsBase<GridVarsLocalView>;
-    using IpVariables = typename GridVarsLocalView::GridVariables::IntegrationPointVariables;
+    using ParentType = FEOperatorsBase<ElementVariables>;
+    using IpVariables = typename ElementVariables::GridVariables::IntegrationPointVariables;
 
 public:
     //! export flux term type
@@ -66,7 +66,7 @@ public:
         for (unsigned int i = 0; i < ipData.size(); ++i)
         {
             auto tmp = ipData.gradN(i);
-            tmp *= this->gridVariablesLocalView().elemSol()[i];
+            tmp *= this->elemVariables().elemSol()[i];
             gradX += tmp;
         }
 
@@ -74,6 +74,7 @@ public:
         FluxTerm result(0.0);
         assert(result.size() == 1);
         result[0] = mv(this->problem_().poissonTensor(), gradX);
+        result[0] *= -1.0;
 
         return result;
     }

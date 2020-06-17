@@ -50,14 +50,18 @@ namespace Dumux {
  * \tparam Assembler A PDE linearized system assembler
  * \tparam LinearSolver A linear system solver
  */
-template<class Assembler, class LinearSolver>
+template<class A, class LinearSolver>
 class PDESolver
 {
-    using SolutionVector = typename Assembler::ResidualType;
-    using Scalar = typename Assembler::Scalar;
+    using Variables = typename A::Variables;
+
+    using Scalar = typename A::Scalar;
     using TimeLoop = TimeLoopBase<Scalar>;
 
 public:
+
+    using Assembler = A;
+
     PDESolver(std::shared_ptr<Assembler> assembler,
               std::shared_ptr<LinearSolver> linearSolver)
     : assembler_(assembler)
@@ -70,22 +74,21 @@ public:
      * \brief Solve the given PDE system (usually assemble + solve linear system + update)
      * \param sol a solution vector possbilty containing an initial solution
      */
-    virtual void solve(SolutionVector& sol) = 0;
+    virtual void solve(Variables& vars) = 0;
+    //
+    // /*!
+    //  * \brief Solve the given PDE system with time step control
+    //  * \note This is used for solvers that are allowed to e.g. automatically reduce the
+    //  *       time step if the solve was not successful
+    //  * \param sol a solution vector possbilty containing an initial solution
+    //  * \param timeLoop a reference to the current time loop
+    //  */
+    // virtual void solve(SolutionVector& sol, TimeLoop& timeLoop)
+    // {
+    //     // per default we just forward to the method without time step control
+    //     solve(sol);
+    // }
 
-    /*!
-     * \brief Solve the given PDE system with time step control
-     * \note This is used for solvers that are allowed to e.g. automatically reduce the
-     *       time step if the solve was not successful
-     * \param sol a solution vector possbilty containing an initial solution
-     * \param timeLoop a reference to the current time loop
-     */
-    virtual void solve(SolutionVector& sol, TimeLoop& timeLoop)
-    {
-        // per default we just forward to the method without time step control
-        solve(sol);
-    }
-
-protected:
     /*!
      * \brief Access the assembler
      */
@@ -110,6 +113,7 @@ protected:
     LinearSolver& linearSolver()
     { return *linearSolver_; }
 
+protected:
     /*!
      * \brief Helper function to assure the MultiTypeBlockMatrix's sub-blocks have the correct sizes.
      */

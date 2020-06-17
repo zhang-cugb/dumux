@@ -31,42 +31,34 @@ template<class Scalar>
 class TimeLevel
 {
 public:
-    struct TimeStepData
-    {
-        Scalar previousTime;
-        Scalar timeStepFraction;
-    };
 
     TimeLevel(Scalar curTime)
     : curTime_(curTime)
-    , timeStepDataAvailable_(false)
+    , prevTime_(curTime)
+    , timeStepFraction_(1.0)
     {}
 
     TimeLevel(Scalar curTime,
               Scalar prevTime,
               Scalar dtFraction)
     : curTime_(curTime)
-    , timeStepData_({prevTime, dtFraction})
-    , timeStepDataAvailable_(true)
+    , prevTime_(prevTime)
+    , timeStepFraction_(dtFraction)
     {}
 
-    Scalar currentTime() const
+    Scalar current() const
     { return curTime_; }
 
-    bool timeStepDataAvailable() const
-    { return timeStepDataAvailable_; }
+    Scalar previous() const
+    { return prevTime_; }
 
-    const TimeStepData& timeStepData() const
-    {
-        if (!timeStepDataAvailable())
-            DUNE_THROW(Dune::InvalidStateException, "No time step data available");
-        return timeStepData_;
-    }
+    Scalar timeStepFraction() const
+    { return timeStepFraction_; }
 
 private:
     Scalar curTime_;
-    TimeStepData timeStepData_;
-    bool timeStepDataAvailable_;
+    Scalar prevTime_;
+    Scalar timeStepFraction_;
 };
 
 } // end namespace Dumux

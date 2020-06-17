@@ -18,9 +18,8 @@
  *****************************************************************************/
 /*!
  * \file
- * \brief Test solving a 2d poisson problem with the finite element method.
- *        This helps identifying the minimum requirements for solving a problem
- *        using the finite element framework.
+ * \brief Test solving a time-dependent algebraic problem with the
+ *        finite element method.
  */
 #include <config.h>
 #include <iostream>
@@ -55,15 +54,13 @@
 #include "operators.hh"
 #include <dumux/assembly/fem/localoperator.hh> // TODO: order is like this because of the problem traits issue
 
-template<class Scalar, class SolutionVector, class GridVariables, class TimeStepper>
-std::vector<Scalar> computeErrors(SolutionVector& x,
-                                  GridVariables& gridVariables,
+template<class Scalar, class GridVariables, class TimeStepper>
+std::vector<Scalar> computeErrors(GridVariables& gridVariables,
                                   TimeStepper& timeStepper)
 {
-    // initialize solution & variables
-    x = 0.0;
+    auto x = gridVariables.dofs(); x = 0.0;
     gridVariables.update(x, /*timeLevel*/0.0);
-
+unsigned int count = 0;
     std::vector<Scalar> errors;
     Dumux::TimeLoop<Scalar> timeLoop(/*tInit*/0.0,
                                      Dumux::getParam<Scalar>("TimeLoop.Dt"),
@@ -71,7 +68,7 @@ std::vector<Scalar> computeErrors(SolutionVector& x,
     timeLoop.start(); do
     {
         // do time integration
-        timeStepper.step(x, gridVariables, timeLoop.time(), timeLoop.timeStepSize());
+        timeStepper.step(gridVariables, timeLoop.time(), timeLoop.timeStepSize());
 
         // advance to the time loop to the next step
         timeLoop.advanceTimeStep();
@@ -86,7 +83,12 @@ std::vector<Scalar> computeErrors(SolutionVector& x,
         using PrimaryVariables = typename GridVariables::PrimaryVariables;
         auto evalExact = [&] (const auto& pos) { return problem.exactSolution(time); };
         auto exactGF = makeAnalyticGridViewFunction(evalExact, gridView);
-        auto numericGF = makeDiscreteGlobalBasisFunction<PrimaryVariables>(gridGeometry.feBasis(), x);
+        auto numericGF = makeDiscreteGlobalBasisFunction<PrimaryVariables>(gridGeometry.feBasis(), gridVariables.dofs());
+
+        Dune::VTKWriter<typename GridVariables::GridGeometry::GridView> vtkWriter(gridView);
+        vtkWriter.addVertexData(exactGF, Dune::VTK::FieldInfo("exact", Dune::VTK::FieldInfo::Type::scalar, 1));
+        vtkWriter.addVertexData(numericGF, Dune::VTK::FieldInfo("numeric", Dune::VTK::FieldInfo::Type::scalar, 1));
+        vtkWriter.write("output_" + std::to_string(count++));
 
         const auto error = Dumux::integrateL2Error(gridView, exactGF, numericGF, 2);
 
@@ -138,12 +140,9 @@ int main (int argc, char *argv[]) try
     using PrimaryVariables = typename ProblemTraits<Problem>::PrimaryVariables;
     using SolutionVector = Dune::BlockVector<PrimaryVariables>;
     using GridVariables = FEGridVariables<Problem, SolutionVector>;
-    auto gridVariables = std::make_shared<GridVariables>(problem);
-
-    // initialize grid variables with initial solution
-    SolutionVector x(gridGeometry->numDofs());
-    x = 0.0;
-    gridVariables->init(x, /*initTime*/0.0);
+    auto gridVariables = std::make_shared<GridVariables>(problem, [&] (auto& dofs) {
+        dofs.resize(gridGeometry->numDofs());
+    });
 
     // the local operator type
     using Operators = FEAlgebraicOperators<typename GridVariables::LocalView>;
@@ -173,28 +172,28 @@ int main (int argc, char *argv[]) try
     {
         auto expEuler = std::make_shared< MultiStage::ExplicitEuler<Scalar> >();
         TimeStepper timeStepper(newtonSolver, expEuler);
-        printErrors(computeErrors<Scalar>(x, *gridVariables, timeStepper), "explicit Euler    ");
+        printErrors(computeErrors<Scalar>(*gridVariables, timeStepper), "explicit Euler    ");
     }
 
     // 2. Theta
     {
         auto theta = std::make_shared< MultiStage::Theta<Scalar> >(0.5);
         TimeStepper timeStepper(newtonSolver, theta);
-        printErrors(computeErrors<Scalar>(x, *gridVariables, timeStepper), "theta scheme (0.5)");
+        printErrors(computeErrors<Scalar>(*gridVariables, timeStepper), "theta scheme (0.5)");
     }
 
     // 3. implicit Euler
     {
         auto impEuler = std::make_shared< MultiStage::ImplicitEuler<Scalar> >();
         TimeStepper timeStepper(newtonSolver, impEuler);
-        printErrors(computeErrors<Scalar>(x, *gridVariables, timeStepper), "implicit Euler    ");
+        printErrors(computeErrors<Scalar>(*gridVariables, timeStepper), "implicit Euler    ");
     }
 
     // 4. Runge-Kutta 4th order (explicit)
     {
         auto rk4 = std::make_shared< MultiStage::RungeKuttaExplicitFourthOrder<Scalar> >();
         TimeStepper timeStepper(newtonSolver, rk4);
-        printErrors(computeErrors<Scalar>(x, *gridVariables, timeStepper), "Runge-Kutta 4th   ");
+        printErrors(computeErrors<Scalar>(*gridVariables, timeStepper), "Runge-Kutta 4th   ");
     }
 
     return 0;

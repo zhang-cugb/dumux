@@ -87,12 +87,9 @@ int main (int argc, char *argv[]) try
     using PrimaryVariables = typename ProblemTraits<Problem>::PrimaryVariables;
     using SolutionVector = Dune::BlockVector<PrimaryVariables>;
     using GridVariables = FEGridVariables<Problem, SolutionVector>;
-    auto gridVariables = std::make_shared<GridVariables>(problem);
-
-    // initialize grid variables with initial solution
-    SolutionVector x(gridGeometry->numDofs());
-    x = 0.0;
-    gridVariables->init(x);
+    auto gridVariables = std::make_shared<GridVariables>(problem, [&] (auto& dofs) {
+        dofs.resize(gridGeometry->numDofs());
+    });
 
     // the local operator type
     using Operators = FEPoissonOperators<typename GridVariables::LocalView>;
@@ -109,9 +106,10 @@ int main (int argc, char *argv[]) try
     auto newtonSolver = std::make_shared<NewtonSolver>(assembler, linearSolver);
 
     // solve the system
-    newtonSolver->solve(x, *gridVariables);
+    newtonSolver->solve(*gridVariables);
 
     // Write out the numerical and the exact solutions
+    const auto& x = gridVariables->dofs();
     auto evalExact = [problem] (const auto& pos) { return problem->exact(pos); };
     auto exactGF = Dune::Functions::makeAnalyticGridViewFunction(evalExact, gridGeometry->gridView());
     auto numericGF = Dune::Functions::makeDiscreteGlobalBasisFunction<PrimaryVariables>(gridGeometry->feBasis(), x);

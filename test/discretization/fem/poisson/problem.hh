@@ -130,7 +130,12 @@ public:
      * \param globalPos The position on the boundary
      */
     PrimaryVariables dirichletAtPos(const GlobalPosition& globalPos) const
-    { return exact(globalPos); }
+    {
+        static const bool print = getParam<bool>("BoundaryPositions.Print");
+        if (print && (globalPos[0] < 1e-6 && globalPos[1] < 0.3 + 1e-6))
+            std::cout << "pos = " << globalPos << std::endl;
+        return exact(globalPos);
+    }
 
     // \}
 

@@ -194,55 +194,11 @@ public:
 
     /*!
      * \brief Run the Newton method to solve a non-linear system.
-     *        Does time step control when the Newton fails to converge
-     */
-    void solve(SolutionVector& uCurrentIter, TimeLoop& timeLoop) override
-    {
-        if (this->assembler().isStationaryProblem())
-            DUNE_THROW(Dune::InvalidStateException, "Using time step control with stationary problem makes no sense!");
-
-        // try solving the non-linear system
-        for (std::size_t i = 0; i <= maxTimeStepDivisions_; ++i)
-        {
-            // linearize & solve
-            const bool converged = solve_(uCurrentIter);
-
-            if (converged)
-                return;
-
-            else if (!converged && i < maxTimeStepDivisions_)
-            {
-                // set solution to previous solution
-                uCurrentIter = this->assembler().prevSol();
-
-                // reset the grid variables to the previous solution
-                this->assembler().resetTimeStep(uCurrentIter);
-
-                if (verbosity_ >= 1)
-                    std::cout << "Newton solver did not converge with dt = "
-                              << timeLoop.timeStepSize() << " seconds. Retrying with time step of "
-                              << timeLoop.timeStepSize() * retryTimeStepReductionFactor_ << " seconds\n";
-
-                // try again with dt = dt * retryTimeStepReductionFactor_
-                timeLoop.setTimeStepSize(timeLoop.timeStepSize() * retryTimeStepReductionFactor_);
-            }
-
-            else
-            {
-                DUNE_THROW(NumericalProblem, "Newton solver didn't converge after "
-                                             << maxTimeStepDivisions_ << " time-step divisions. dt="
-                                             << timeLoop.timeStepSize() << '\n');
-            }
-        }
-    }
-
-    /*!
-     * \brief Run the Newton method to solve a non-linear system.
      *        The solver is responsible for all the strategic decisions.
      */
-    void solve(SolutionVector& uCurrentIter) override
+    void solve(Variables& variables) override
     {
-        const bool converged = solve_(uCurrentIter);
+        const bool converged = solve_(variables);
         if (!converged)
             DUNE_THROW(NumericalProblem, "Newton solver didn't converge after "
                                          << numSteps_ << " iterations.\n");
@@ -254,15 +210,15 @@ public:
      *
      * \param u The initial solution
      */
-    virtual void newtonBegin(SolutionVector& u)
+    virtual void newtonBegin(Variables& variables, SolutionVector& u)
     {
         numSteps_ = 0;
-        priVarSwitchAdapter_->initialize(u, this->assembler().gridVariables());
+        priVarSwitchAdapter_->initialize(u, variables);
 
         // write the initial residual if a convergence writer was set
         if (convergenceWriter_)
         {
-            this->assembler().assembleResidual(u);
+            this->assembler().assembleResidual(variables);
             SolutionVector delta(u);
             delta = 0; // dummy vector, there is no delta before solving the linear system
             convergenceWriter_->write(u, delta, this->assembler().residual());
@@ -322,9 +278,9 @@ public:
      *
      * \param uCurrentIter The current iteration's solution vector
      */
-    virtual void assembleLinearSystem(const SolutionVector& uCurrentIter)
+    virtual void assembleLinearSystem(const Variables& variables)
     {
-        assembleLinearSystem_(this->assembler(), uCurrentIter);
+        assembleLinearSystem_(this->assembler(), variables);
 
         if (enablePartialReassembly_)
             partialReassembler_->report(comm_, endIterMsgStream_);
@@ -348,7 +304,7 @@ public:
         try
         {
             if (numSteps_ == 0)
-                initialResidualNorm_ = this->linearSolver().norm(b);
+                initialResidualNorm_ = b.two_norm(); // TODO this->linearSolver().norm(b);
 
             // solve by calling the appropriate implementation depending on whether the linear solver
             // is capable of handling MultiType matrices or not
@@ -398,7 +354,8 @@ public:
      *               system of equations. This parameter also stores
      *               the updated solution.
      */
-    void newtonUpdate(SolutionVector &uCurrentIter,
+    void newtonUpdate(Variables& variables,
+                      SolutionVector &uCurrentIter,
                       const SolutionVector &uLastIter,
                       const SolutionVector &deltaU)
     {
@@ -441,7 +398,7 @@ public:
         // }
 
         if (useLineSearch_)
-            lineSearchUpdate_(uCurrentIter, uLastIter, deltaU);
+            lineSearchUpdate_(variables, uCurrentIter, uLastIter, deltaU);
 
         else if (useChop_)
             choppedUpdate_(uCurrentIter, uLastIter, deltaU);
@@ -451,16 +408,9 @@ public:
             uCurrentIter = uLastIter;
             uCurrentIter -= deltaU;
 
+            Backend::update(variables, uCurrentIter);
             if (enableResidualCriterion_)
-                computeResidualReduction_(uCurrentIter);
-
-            else
-            {
-                // If we get here, the convergence criterion does not require
-                // additional residual evaluations. Thus, the grid variables have
-                // not yet been updated to the new uCurrentIter.
-                this->assembler().updateGridVariables(uCurrentIter);
-            }
+                computeResidualReduction_(variables, uCurrentIter);
         }
     }
 
@@ -470,10 +420,11 @@ public:
      * \param uCurrentIter The solution after the current Newton iteration
      * \param uLastIter The solution at the beginning of the current Newton iteration
      */
-    virtual void newtonEndStep(SolutionVector &uCurrentIter,
+    virtual void newtonEndStep(Variables& variables,
+                               SolutionVector &uCurrentIter,
                                const SolutionVector &uLastIter)
     {
-        priVarSwitchAdapter_->invoke(uCurrentIter, this->assembler().gridVariables());
+        priVarSwitchAdapter_->invoke(uCurrentIter, variables);
 
         ++numSteps_;
 
@@ -691,11 +642,11 @@ public:
 
 protected:
 
-    void computeResidualReduction_(const SolutionVector &uCurrentIter)
+    void computeResidualReduction_(Variables& variables, const SolutionVector &uCurrentIter)
     {
         auto residual = Backend::makeZeroDofVector(Backend::size(uCurrentIter));
-        this->assembler().assembleResidual(residual, uCurrentIter);
-        residualNorm_ = this->linearSolver().norm(residual);
+        this->assembler().assembleResidual(residual, variables);
+        residualNorm_ = residual.two_norm(); // TODO: this->linearSolver().norm(residual);
         reduction_ = residualNorm_;
         reduction_ /= initialResidualNorm_;
     }
@@ -732,12 +683,14 @@ private:
      * \brief Run the Newton method to solve a non-linear system.
      *        The solver is responsible for all the strategic decisions.
      */
-    bool solve_(SolutionVector& uCurrentIter)
+    bool solve_(Variables& variables)
     {
+        auto uCurrentIter = Backend::getDofVector(variables);
+
         try
         {
             // newtonBegin may manipulate the solution
-            newtonBegin(uCurrentIter);
+            newtonBegin(variables, uCurrentIter);
 
             // the given solution is the initial guess
             auto uLastIter = Backend::makeDofVector(uCurrentIter);
@@ -771,7 +724,7 @@ private:
 
                 // linearize the problem at the current solution
                 assembleTimer.start();
-                assembleLinearSystem(uCurrentIter);
+                assembleLinearSystem(variables);
                 assembleTimer.stop();
 
                 ///////////////
@@ -806,16 +759,16 @@ private:
                 updateTimer.start();
                 // update the current solution (i.e. uOld) with the delta
                 // (i.e. u). The result is stored in u
-                newtonUpdate(uCurrentIter, uLastIter, deltaU);
+                newtonUpdate(variables, uCurrentIter, uLastIter, deltaU);
                 updateTimer.stop();
 
                 // tell the solver that we're done with this iteration
-                newtonEndStep(uCurrentIter, uLastIter);
+                newtonEndStep(variables, uCurrentIter, uLastIter);
 
                 // if a convergence writer was specified compute residual and write output
                 if (convergenceWriter_)
                 {
-                    this->assembler().assembleResidual(uCurrentIter);
+                    this->assembler().assembleResidual(variables);
                     convergenceWriter_->write(uCurrentIter, deltaU, this->assembler().residual());
                 }
 
@@ -864,18 +817,18 @@ private:
 
     //! assembleLinearSystem_ for assemblers that support partial reassembly
     template<class A>
-    auto assembleLinearSystem_(const A& assembler, const SolutionVector& uCurrentIter)
+    auto assembleLinearSystem_(const A& assembler, const Variables& variables)
     -> typename std::enable_if_t<decltype(isValid(Detail::supportsPartialReassembly())(assembler))::value, void>
     {
-        this->assembler().assembleJacobianAndResidual(uCurrentIter, partialReassembler_.get());
+        this->assembler().assembleJacobianAndResidual(variables, partialReassembler_.get());
     }
 
     //! assembleLinearSystem_ for assemblers that don't support partial reassembly
     template<class A>
-    auto assembleLinearSystem_(const A& assembler, const SolutionVector& uCurrentIter)
+    auto assembleLinearSystem_(const A& assembler, const Variables& variables)
     -> typename std::enable_if_t<!decltype(isValid(Detail::supportsPartialReassembly())(assembler))::value, void>
     {
-        this->assembler().assembleJacobianAndResidual(uCurrentIter);
+        this->assembler().assembleJacobianAndResidual(variables);
     }
 
     /*!
@@ -924,7 +877,8 @@ private:
     //     forEach(integralRange(Dune::Hybrid::size(uLastIter)), doUpdate);
     // }
 
-    virtual void lineSearchUpdate_(SolutionVector &uCurrentIter,
+    virtual void lineSearchUpdate_(Variables& variables,
+                                   SolutionVector &uCurrentIter,
                                    const SolutionVector &uLastIter,
                                    const SolutionVector &deltaU)
     {
@@ -936,7 +890,8 @@ private:
             uCurrentIter *= -lambda;
             uCurrentIter += uLastIter;
 
-            computeResidualReduction_(uCurrentIter);
+            Backend::update(variables, uCurrentIter);
+            computeResidualReduction_(variables, uCurrentIter);
 
             if (reduction_ < lastReduction_ || lambda <= 0.125) {
                 endIterMsgStream_ << ", residual reduction " << lastReduction_ << "->"  << reduction_ << "@lambda=" << lambda;

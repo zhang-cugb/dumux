@@ -27,6 +27,7 @@
 
 #include <dune/common/fmatrix.hh>
 #include <dune/common/exceptions.hh>
+#include <dune/functions/functionspacebases/subentitydofs.hh>
 
 #include <dune/geometry/quadraturerules.hh>
 #include <dune/istl/bvector.hh>
@@ -45,11 +46,11 @@ namespace Dumux {
  * \todo TODO: This currently assumes Standard Galerkin type fem schemes as
  *             well as non-composite function space bases. Can we generalize this?
  */
-template<class GridVarsLocalView, class Operators>
+template<class ElementVariables, class Operators>
 class FELocalOperator
 {
     // The variables required for the evaluation of the equation
-    using GridVars = typename GridVarsLocalView::GridVariables;
+    using GridVars = typename ElementVariables::GridVariables;
     using IpVariables = typename GridVars::IntegrationPointVariables;
     using PrimaryVariables = typename GridVars::PrimaryVariables;
 
@@ -63,7 +64,6 @@ class FELocalOperator
     using Problem = typename GridVars::Problem;
     using NumEqVector = typename ProblemTraits<Problem>::NumEqVector;
     using BoundaryTypes = typename ProblemTraits<Problem>::BoundaryTypes;
-    using ElemBoundaryTypes = FEElementBoundaryTypes<BoundaryTypes>;
 
     static constexpr int dim = GridView::dimension;
     static constexpr int numEq = NumEqVector::size();
@@ -91,13 +91,12 @@ public:
      */
     FELocalOperator(const Element& element,
                     const FEElementGeometry& feGeometry,
-                    const GridVarsLocalView& gridVarsLocalView)
-    : element_(&element)
-    , feGeometry_(&feGeometry)
-    , gridVarsLocalView_(&gridVarsLocalView)
-    , operators_(element, feGeometry, gridVarsLocalView)
+                    const ElementVariables& elemVars)
+    : element_(element)
+    , feGeometry_(feGeometry)
+    , elemVariables_(elemVars)
+    , operators_(element, feGeometry, elemVars)
     {
-        elemBcTypes_.update(problem_(), element, feGeometry);
         setDefaultIntegrationOrders_();
     }
 
@@ -139,7 +138,7 @@ public:
 
     ElementResidualVector getEmptyResidual() const
     {
-        const auto& localView = feGeometry().feBasisLocalView();
+        const auto& localView = feGeometry_.feBasisLocalView();
         ElementResidualVector res(localView.tree().finiteElement().localBasis().size());
         res = 0.0;
         return res;
@@ -157,33 +156,9 @@ public:
     //\}
 
     /*!
-     * \name Return functions for underlying data structures
+     * \name Setter functions for integration orders
      */
     // \{
-
-    /*!
-     * \brief Return a reference to the underlying grid element
-     */
-    const Element& element() const
-    { return *element_; }
-
-    /*!
-     * \brief Return the local view on the grid geometry
-     */
-    const FEElementGeometry& feGeometry() const
-    { return *feGeometry_; }
-
-    /*!
-     * \brief Return reference to the grid variables
-     */
-    const GridVarsLocalView& gridVariablesLocalView() const
-    { return *gridVarsLocalView_; }
-
-    /*!
-     * \brief Return reference to the element boundary types
-     */
-    const ElemBoundaryTypes& elemBcTypes() const
-    { return elemBcTypes_; }
 
     /*!
      * \brief Set the integration order to be used for volume integrals.
@@ -214,14 +189,14 @@ protected:
     ElementResidualVector integrateTerms_(VolumeTerms&& volumeTerms,
                                           FluxTerms&& fluxTerms) const
     {
-        const auto& basisLocalView = feGeometry_->feBasisLocalView();
+        const auto& basisLocalView = feGeometry_.feBasisLocalView();
         const auto& localBasis = basisLocalView.tree().finiteElement().localBasis();
         const auto numLocalDofs = localBasis.size();
 
         ElementResidualVector result(numLocalDofs);
         result = 0.0;
 
-        const auto& geometry = element().geometry();
+        const auto& geometry = element_.geometry();
         const auto& quadRule = Dune::QuadratureRules<Scalar, dim>::rule(geometry.type(), intOrder_);
         for (const auto& quadPoint : quadRule)
         {
@@ -230,7 +205,7 @@ protected:
 
             // calculate secondary variables for the previous and the current solution at the ip
             IpVariables ipVars;
-            ipVars.update(gridVariablesLocalView().elemSol(), problem_(), element(), ipData);
+            ipVars.update(elemVariables_.elemSol(), problem_(), element_, ipData);
 
             // evaluate terms and add entries to result
             const auto volume = volumeTerms(ipData, ipVars);
@@ -239,7 +214,7 @@ protected:
             Scalar qWeight = quadPoint.weight()*geometry.integrationElement(quadPoint.position());
             for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
                 for (unsigned int i = 0; i < numLocalDofs; ++i)
-                    result[i][eqIdx] -= qWeight*ipVars.extrusionFactor()
+                    result[i][eqIdx] += qWeight*ipVars.extrusionFactor()
                                         *(volume[eqIdx]*ipData.shapeValue(i)
                                           + flux[eqIdx]*ipData.gradN(i));
         }
@@ -254,14 +229,14 @@ protected:
     template<class VolumeTerms>
     ElementResidualVector integrateVolumeTerms_(VolumeTerms&& volumeTerms) const
     {
-        const auto& basisLocalView = feGeometry_->feBasisLocalView();
+        const auto& basisLocalView = feGeometry_.feBasisLocalView();
         const auto& localBasis = basisLocalView.tree().finiteElement().localBasis();
         const auto numLocalDofs = localBasis.size();
 
         ElementResidualVector result(numLocalDofs);
         result = 0.0;
 
-        const auto& geometry = element().geometry();
+        const auto& geometry = element_.geometry();
         const auto& quadRule = Dune::QuadratureRules<Scalar, dim>::rule(geometry.type(), intOrder_);
         for (const auto& quadPoint : quadRule)
         {
@@ -270,14 +245,14 @@ protected:
 
             // calculate secondary variables for the previous and the current solution at the ip
             IpVariables ipVars;
-            ipVars.update(gridVariablesLocalView().elemSol(), problem_(), element(), ipData);
+            ipVars.update(elemVariables_.elemSol(), problem_(), element_, ipData);
 
             // evaluate terms and add entries to result
             const auto volume = volumeTerms(ipData, ipVars);
             Scalar qWeight = quadPoint.weight()*geometry.integrationElement(quadPoint.position());
             for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
                 for (unsigned int i = 0; i < numLocalDofs; ++i)
-                    result[i][eqIdx] -= qWeight*ipVars.extrusionFactor()
+                    result[i][eqIdx] += qWeight*ipVars.extrusionFactor()
                                         *volume[eqIdx]*ipData.shapeValue(i);
         }
 
@@ -289,26 +264,29 @@ protected:
      */
     ElementResidualVector evalNeumannSegments_() const
     {
-        const auto& basisLocalView = feGeometry_->feBasisLocalView();
+        const auto& basisLocalView = feGeometry_.feBasisLocalView();
         const auto& localBasis = basisLocalView.tree().finiteElement().localBasis();
         const auto numLocalDofs = localBasis.size();
 
         ElementResidualVector result(numLocalDofs);
         result = 0.0;
 
-        // skip the rest if element is not connected to Neumann boundaries
-        if (!elemBcTypes_.hasNeumann())
-            return result;
-
         // integrate Neumann boundary contribution
-        const auto geometry = element().geometry();
-        for (const auto& is : intersections(feGeometry_->gridGeometry().gridView(), element()))
+        const auto geometry = element_.geometry();
+        for (const auto& is : intersections(feGeometry_.gridGeometry().gridView(), element_))
         {
             // only handle faces on the boundary
             if (!is.boundary())
                 continue;
 
-            // TODO: If none of the dofs living on this intersection has neumann BC defined, skip rest
+            // If none of the dofs living on this intersection has neumann BC defined, skip rest
+            // TODO: TIME???
+            const auto bcTypes = problem_().boundaryTypes(element_, is);
+            if (!bcTypes.hasNeumann())
+                continue;
+
+            // get the dofs of this intersection
+            const auto isDofs = Dune::Functions::subEntityDOFs(basisLocalView, is);
 
             // select quadrature rule for intersection faces (dim-1)
             auto insideGeom = is.geometryInInside();
@@ -323,10 +301,10 @@ protected:
 
                 // evaluate primary/secondary variables at integration point
                 IpVariables ipVars;
-                ipVars.update(gridVariablesLocalView().elemSol(), problem_(), element(), ipData);
+                ipVars.update(elemVariables_.elemSol(), problem_(), element_, ipData);
 
                 // evaluate neumann boundary condition
-                const auto neumannFlux = problem_().neumann(element(), is, gridVariablesLocalView(), ipData, ipVars);
+                const auto neumannFlux = problem_().neumann(element_, is, elemVariables_, ipData, ipVars);
 
                 // get quadrature rule weight for intersection
                 Scalar qWeight = quadPoint.weight();
@@ -334,10 +312,15 @@ protected:
                 qWeight *= ipVars.extrusionFactor();
 
                 // add entries to residual vector
-                for (unsigned int i = 0; i < numLocalDofs; ++i)
-                    for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
-                        if (elemBcTypes_[i].isNeumann(eqIdx))
+                for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
+                {
+                    if (!bcTypes.isNeumann(eqIdx))
+                        continue;
+
+                    for (unsigned int i = 0; i < numLocalDofs; ++i)
+                        if (isDofs.contains(i))
                             result[i][eqIdx] += ipData.shapeValue(i)*qWeight*neumannFlux[eqIdx];
+                }
             }
         }
 
@@ -346,13 +329,13 @@ protected:
 
     //! return reference to the underlying problem
     const Problem& problem_() const
-    { return gridVariablesLocalView().gridVariables().problem(); }
+    { return elemVariables_.gridVariables().problem(); }
 
 private:
     //! obtains the integration orders from the input file or default values
     void setDefaultIntegrationOrders_()
     {
-        static const auto basisOrder = feGeometry_->feBasisLocalView().tree().finiteElement().localBasis().order();
+        static const auto basisOrder = feGeometry_.feBasisLocalView().tree().finiteElement().localBasis().order();
         static const auto intOrder = getParamFromGroup<unsigned int>(problem_().paramGroup(), "Assembly.FEIntegrationOrder", basisOrder+1);
         static const auto bOrder = getParamFromGroup<unsigned int>(problem_().paramGroup(), "Assembly.FEBoundaryIntegrationOrder", intOrder);
 
@@ -360,13 +343,11 @@ private:
         intOrderBoundary_ = bOrder;
     }
 
-    const Element* element_;                     //!< pointer to the element for which the residual is computed
-    const FEElementGeometry* feGeometry_;        //!< the local view on the finite element grid geometry
-    const GridVarsLocalView* gridVarsLocalView_; //!< the local view on the grid variables
-    ElemBoundaryTypes elemBcTypes_;              //!< the boundary types defined for all dofs of the element
+    const Element& element_;                 //!< pointer to the element for which the residual is computed
+    const FEElementGeometry& feGeometry_;    //!< the local view on the finite element grid geometry
+    const ElementVariables& elemVariables_;  //!< the local view on the grid variables
 
     Operators operators_; //!< evaluates storage/flux operators of the actual equation at integration points
-
     unsigned int intOrder_;               //!< Integration order used for volume integrals
     unsigned int intOrderBoundary_;       //!< Integration order used for integration of boundary conditions
 };

@@ -1,3 +1,6 @@
+[BoundaryPositions]
+Print = false
+
 [Grid]
 UpperRight = 3 3
 Cells = 100 100
@@ -6,4 +9,4 @@ Cells = 100 100
 Name = poisson
 
 [SpatialParams]
-TensorValue = 1
+TensorValue = 1.0

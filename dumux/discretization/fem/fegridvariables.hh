@@ -73,7 +73,7 @@ public:
     void bind(const Element& element,
               const FEElementGeometry& feGeometry)
     {
-        const auto& x = gridVariables().solutionVector();
+        const auto& x = gridVariables().dofs();
         const auto& gg = gridVariables().gridGeometry();
         elemSol_ = elementSolution(element, x, gg);
     }
@@ -148,10 +148,24 @@ public:
     using TimeLevel = Dumux::TimeLevel<Scalar>;
 
     //! constructor
-    FEGridVariables(std::shared_ptr<const Problem> problem)
+    FEGridVariables(std::shared_ptr<const Problem> problem,
+                    const TimeLevel& timeLevel = TimeLevel{0.0})
     : problem_(problem)
-    , timeLevel_(0.0)
-    {}
+    , timeLevel_(timeLevel)
+    {
+        problem->applyInitialSolution(x_);
+    }
+
+    //! TODO
+    template<class ApplyInitialSol>
+    FEGridVariables(std::shared_ptr<const Problem> problem,
+                    const ApplyInitialSol& applyInitialSol,
+                    const TimeLevel& timeLevel = TimeLevel{0.0})
+    : problem_(problem)
+    , timeLevel_(timeLevel)
+    {
+        applyInitialSol(x_);
+    }
 
     //! return the underlying problem
     const Problem& problem() const
@@ -162,63 +176,36 @@ public:
     { return problem_->gridGeometry(); }
 
     //! return the solution for which the grid variables were updated
-    const SolutionVector& solutionVector() const
-    { assert(x_ && "No solution vector set!"); return *x_; }
+    const SolutionVector& dofs() const
+    { return x_; }
 
-    ///////////////
-    // TODO: The following interfaces are defined in FVGridVariables.
-    //       DO WE NEED ALL OF THEM?
-    //////////////
-
-    //! initialize all variables for a given solution
-    void init(const SolutionVector& x)
-    {
-        x_ = &x;
-        considerTimeLevels_ = false;
-    }
-
-    //! initialize all variables for a given solution and time level
-    void init(const SolutionVector& x, const TimeLevel& timeLevel)
-    {
-        x_ = &x;
-        timeLevel_ = timeLevel;
-        considerTimeLevels_ = true;
-    }
+    //! return the time level the grid variables represent
+    const TimeLevel& timeLevel() const
+    { return timeLevel_; }
 
     //! update all variables subject to a new solution
-    void update(const SolutionVector& x)
+    void updateDofs(const SolutionVector& x)
     {
-        if (considerTimeLevels_)
-            DUNE_THROW(Dune::InvalidStateException,
-                       "GridVariables have been initialized as instationary. Please use update(x, timelevel)");
-        x_ = &x;
+        x_ = x;
+    }
+
+    //! TODO Doc me
+    void updateTime(const TimeLevel& timeLevel)
+    {
+        timeLevel_ = timeLevel;
     }
 
     //! update all variables subject to a new solution
     void update(const SolutionVector& x, const TimeLevel& timeLevel)
     {
-        if (!considerTimeLevels_)
-            DUNE_THROW(Dune::InvalidStateException,
-                       "GridVariables have been initialized as stationary. Please use update(x)");
-        x_ = &x;
-        timeLevel_ = timeLevel;
-    }
-
-    //! return the time level the grid variables represent
-    const TimeLevel& timeLevel() const
-    {
-        if (!considerTimeLevels_)
-            DUNE_THROW(Dune::InvalidStateException,
-                       "GridVariables have been initialized as stationary. No time level data available");
-        return timeLevel_;
+        updateDofs(x);
+        updateTime(timeLevel);
     }
 
 private:
     std::shared_ptr<const Problem> problem_; //!< pointer to the problem to be solved
-    const SolutionVector* x_ = nullptr;      //!< the solution corresponding to this class' current state
-
-    TimeLevel timeLevel_;             //!< info during time integration for instationary problems
-    bool considerTimeLevels_ = false; //!< keep track if a time level was set
+    SolutionVector x_;                       //!< the solution corresponding to this class' current state
+    TimeLevel timeLevel_;                    //!< info during time integration for instationary problems
 };
 
 } // end namespace Dumux

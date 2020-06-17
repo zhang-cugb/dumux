@@ -100,47 +100,9 @@ public:
 
         // determine which dofs lie on the boundary
         dofOnBoundary_.assign(numDofs(), false);
-        for (const auto& element : elements(this->gridView()))
-        {
-            auto localView = feBasis().localView();
-            localView.bind(element);
-
-            const auto& fe = localView.tree().finiteElement();
-            const auto refElement = referenceElement(element);
-
-            for (const auto& is : intersections(this->gridView(), element))
-            {
-                if (is.boundary())
-                {
-                    // loop over all dofs in this element and mark those
-                    // that live on this current boundary intersection
-                    for (unsigned int localDofIdx = 0; localDofIdx < localView.size(); localDofIdx++)
-                    {
-                        // get the index and codim of the entity this dof lives on
-                        const auto& localKey = fe.localCoefficients().localKey(localDofIdx);
-                        const auto subEntity = localKey.subEntity();
-                        const auto codim = localKey.codim();
-
-                        // dofs within a grid cell cannot lie on the boundary
-                        if (codim == 0)
-                            continue;
-
-                        // if the entity is a sub-entity of the current boundary intersection, the
-                        // dof at hand is on the boundary. To this end, loop over all sub-entities
-                        // of the intersection that have the same codim as the entity our dof lives on
-                        for (unsigned int i = 0; i < refElement.size(is.indexInInside(), 1, codim); i++)
-                        {
-                            // If j-th sub entity is the sub entity corresponding to our dof, continue and assign BC
-                            if (refElement.subEntity(is.indexInInside(), 1, i, codim) == subEntity)
-                            {
-                                dofOnBoundary_[localView.index(localDofIdx)] = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Dune::Functions::forEachBoundaryDOF(feBasis(), [&] (auto index) {
+            dofOnBoundary_[index] = true;
+        });
     }
 
     //! The total number of degrees of freedom
@@ -151,11 +113,15 @@ public:
     const FEBasis& feBasis() const
     { return *feBasis_; }
 
-    //! If a d.o.f. is on the boundary
+    //! Return the vector indicating which DOFS are on the boundary
+    const std::vector<bool> boundaryDofs() const
+    { return dofOnBoundary_; }
+
+    //! Return true if a DOF is on the boundary
     bool dofOnBoundary(GridIndexType dofIdx) const
     { return dofOnBoundary_[dofIdx]; }
 
-    //! If a vertex / d.o.f. is on a periodic boundary
+    //! Return true if a DOF is on a periodic boundary
     bool dofOnPeriodicBoundary(GridIndexType dofIdx) const
     { DUNE_THROW(Dune::NotImplemented, "Periodic BC support for FEM schemes"); }
 

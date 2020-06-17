@@ -121,11 +121,10 @@ public:
      * \param subEntity The element's sub entity located on the domain boundary
      * \param timeLevel the time level
      */
-    template<class SubEntity>
     BoundaryTypes boundaryTypes(const Element& element,
-                                const SubEntity& subEntity,
+                                const Intersection& is,
                                 const TimeLevel& timeLevel) const
-    { return asImp_().boundaryTypes(element, subEntity); }
+    { return asImp_().boundaryTypes(element, is); }
 
     /*!
      * \brief Specifies which kind of boundary condition should be used for
@@ -134,9 +133,8 @@ public:
      * \param element The grid element on which the degree of freedom
      * \param subEntity The element's sub entity located on the domain boundary
      */
-    template<class SubEntity>
-    BoundaryTypes boundaryTypes(const Element& element, const SubEntity& subEntity) const
-    { return asImp_().boundaryTypesAtPos(subEntity.geometry().center()); }
+    BoundaryTypes boundaryTypes(const Element& element, const Intersection& is) const
+    { return asImp_().boundaryTypesAtPos(is.geometry().center()); }
 
     /*!
      * \brief Specifies which kind of boundary condition should be
@@ -160,11 +158,10 @@ public:
      * \param timeLevel The time level
      * \note The values will be assigned to all dofs living on that sub entity
      */
-    template<class SubEntity>
     PrimaryVariables dirichlet(const Element& element,
-                               const SubEntity& subEntity,
+                               const typename Element::Geometry::LocalCoordinate& localPos,
                                const TimeLevel& timeLevel) const
-    { return asImp_().dirichlet(element, subEntity); }
+    { return asImp_().dirichlet(element, localPos); }
 
     /*!
      * \brief Evaluate the Dirichlet boundary conditions for a boundary
@@ -173,9 +170,9 @@ public:
      * \param subEntity The element's sub entity living on the boundary
      * \note The values will be assigned to all dofs living on that sub entity
      */
-    template<class SubEntity>
-    PrimaryVariables dirichlet(const Element& element, const SubEntity& subEntity) const
-    { return asImp_().dirichletAtPos(subEntity.geometry().center()); }
+    PrimaryVariables dirichlet(const Element& element,
+                               const typename Element::Geometry::LocalCoordinate& localPos) const
+    { return asImp_().dirichletAtPos(element.geometry().global(localPos)); }
 
     /*!
      * \brief Evaluate the Dirichlet boundary conditions at a given position on the boundary.

@@ -28,6 +28,7 @@
 #include <dune/common/fmatrix.hh>
 #include <dune/istl/bvector.hh>
 #include <dune/istl/bcrsmatrix.hh>
+#include <dune/functions/functionspacebases/boundarydofs.hh>
 
 #include <dumux/discretization/method.hh>
 #include <dumux/discretization/localview.hh>
@@ -43,17 +44,19 @@
 namespace Dumux {
 namespace Impl {
 
-    template<class Assembler, DiscretizationMethod dm> struct LocalAssemblerChooser;
+    template<class Assembler, DiscretizationMethod dm, DiffMethod diffMethod> struct LocalAssemblerChooser;
 
     // TODO: Currently the fv local residuals require type tag etc...
     // template<class Assembler> struct LocalAssemblerChooser<Assembler, DiscretizationMethod::tpfa> { using type = CCLocalAssembler<... };
     // template<class Assembler> struct LocalAssemblerChooser<Assembler, DiscretizationMethod::mpfa> { using type = CCLocalAssembler<... };
     // template<class Assembler> struct LocalAssemblerChooser<Assembler, DiscretizationMethod::box> { using type = BoxLocalAssembler<... };
     // template<class Assembler> struct LocalAssemblerChooser<Assembler, DiscretizationMethod::staggered> { using type = ... };
-    template<class Assembler> struct LocalAssemblerChooser<Assembler, DiscretizationMethod::fem> { using type = FEInstationaryLocalAssembler<Assembler>; };
+    template<class Assembler, DiffMethod diffMethod>
+    struct LocalAssemblerChooser<Assembler, DiscretizationMethod::fem, diffMethod>
+    { using type = FEInstationaryLocalAssembler<Assembler, diffMethod>; };
 
-    template<class Assembler, DiscretizationMethod dm>
-    using LocalAssemblerType = typename LocalAssemblerChooser<Assembler, dm>::type;
+    template<class Assembler, DiscretizationMethod dm, DiffMethod diffMethod>
+    using LocalAssemblerType = typename LocalAssemblerChooser<Assembler, dm, diffMethod>::type;
 
 } // end namespace detail
 
@@ -70,6 +73,9 @@ public:
     using JacobianMatrix = Dune::BCRSMatrix<BlockType>;
 };
 
+//! forward declaration, TODO: REMOVE
+template<class P> struct ProblemTraits;
+
 /*!
  * \ingroup Assembly
  * \brief A linear system assembler (residual and Jacobian) for grid-based numerical schemes
@@ -83,8 +89,13 @@ template< class LO, DiffMethod diffMethod,
 class InstationaryAssembler
 {
     using ThisType = InstationaryAssembler<LO, diffMethod, LST>;
-    using GridView = typename LO::GridVariables::GridGeometry::GridView;
+
+    using GG = typename LO::GridVariables::GridGeometry;
+    using GridView = typename GG::GridView;
     using Element = typename GridView::template Codim<0>::Entity;
+
+    using LocalAssembler = Impl::LocalAssemblerType<ThisType, GG::discMethod, diffMethod>;
+    using ElementVariables = typename LO::GridVariables::LocalView;
 
 public:
     //! export the types used for the linear system
@@ -107,10 +118,7 @@ public:
     using Problem = typename GridVariables::Problem;
 
     //! This assembler is for grid-based schemes, so the variables live on a grid geometry
-    using GridGeometry = typename GridVariables::GridGeometry;
-
-    //! The local assembler is the local view on this assembler class
-    using LocalView = Impl::LocalAssemblerType<ThisType, GridGeometry::discMethod>;
+    using GridGeometry = GG;
 
     //! Export type used for solution vectors (the variables depend upon the solution)
     using SolutionVector = typename GridVariables::SolutionVector;
@@ -119,26 +127,16 @@ public:
     using StageParams = MultiStageParams<Scalar>;
 
     /*!
-     * \brief The Constructor from a grid geometry.
-     * \param gridGeometry A grid geometry instance
-     * \note This assembler class is, after construction, defined for a specific equation
-     *       (given by the template argument of the LocalOperator) and a specific grid
-     *       geometry - which defines the connectivity of the degrees of freedom of the
-     *       underlying discretization scheme on a particular grid. The evaluation point,
-     *       consisting of a particular solution/variables/parameters may vary, an therefore,
-     *       an instance of the grid variables is passed to the assembly functions.
+     * \brief The Constructor.
+     * \param gridVariables A grid variables instance
      */
     InstationaryAssembler(std::shared_ptr<const GridGeometry> gridGeometry)
     : gridGeometry_(gridGeometry)
     {}
 
     /*!
-     * \brief Assembles the Jacobian matrix and the residual around the given evaluation point
-     *        which is determined by the grid variables, containing all quantities required
-     *        to evaluate the equations to be assembled.
-     * \param gridVariables The variables corresponding to the given solution state
-     * \note We assume the grid geometry on which the grid variables are defined
-     *       to be the same as the one used to instantiate this class
+     * \brief Assembles the Jacobian matrix and the residual around the evaluation point
+     *        that is determined by the grid variables that have been used for construction.
      */
     template<class PartialReassembler = DefaultPartialReassembler>
     void assembleJacobianAndResidual(const GridVariables& gridVariables,
@@ -147,39 +145,50 @@ public:
         resetJacobian_(partialReassembler);
         resetResidual_();
 
+        auto feGeometry = localView(gridGeometry());
+        std::vector<ElementVariables> elemVars;
+        elemVars.reserve(stageParams_->size());
+
+        for (unsigned int i = 0; i < stageParams_->size()-1; ++i)
+            elemVars.emplace_back(prevStageVariables_[i]);
+        elemVars.emplace_back(gridVariables);
+
         assemble_([&](const Element& element)
         {
-            auto localAssembler = localView(*this);
-            localAssembler.bind(element, gridVariables);
+            feGeometry.bind(element);
+            for (auto& vars : elemVars)
+                vars.bind(element, feGeometry);
+
+            LocalAssembler localAssembler(element, feGeometry, elemVars, *stageParams_);
             localAssembler.assembleJacobianAndResidual(*jacobian_, *residual_, partialReassembler);
         });
 
+        // TODO: Put these into discretization-specific helpers
+        enforceDirichletConstraints_(gridVariables, *jacobian_, *residual_);
+        enforceInternalConstraints_(*jacobian_, *residual_);
         enforcePeriodicConstraints_(*jacobian_, *residual_);
     }
 
     /*!
-     * \brief Assembles the Jacobian matrix of the discrete system of equations
-     *        around a given state represented by the grid variables object.
+     * \brief Assembles the Jacobian matrix around the evaluation point that is
+     *        determined by the grid variables that have been used for construction.
      */
-    void assembleJacobian(const GridVariables& gridVariables)
+    template<class PartialReassembler = DefaultPartialReassembler>
+    void assembleJacobian(const GridVariables& gridVariables,
+                          const PartialReassembler* partialReassembler = nullptr)
     {
-        resetJacobian_();
-        assemble_([&](const Element& element)
-        {
-            auto localAssembler = localView(*this);
-            localAssembler.bind(element, gridVariables);
-            localAssembler.assembleJacobianAndResidual(*jacobian_);
-        });
+        resetJacobian_(partialReassembler);
+        // TODO: WHat to do here?
     }
 
     /*!
      * \brief Assembles the residual for a given state represented by the provided
      *        grid variables object, using the internal residual vector to store the result.
      */
-    void assembleResidual(const GridVariables& gridVariables)
+    void assembleResidual(const GridVariables& gridVars)
     {
         resetResidual_();
-        assembleResidual(*residual_, gridVariables);
+        assembleResidual(*residual_, gridVars);
     }
 
     /*!
@@ -188,66 +197,29 @@ public:
      */
     void assembleResidual(ResidualVector& r, const GridVariables& gridVariables) const
     {
-        // TODO: I leave the line below from the old assembler (commented) because
-        //       I think it illustrates how the solution and the grid variables are
-        //       coupled and that it is probably better to make the assembly routines
-        //       functions of grid variables instead of solutions.
-        //
-        // update the grid variables for the case of active caching
-        // gridVariables_->update(curSol);
+        auto feGeometry = localView(gridGeometry());
+        std::vector<ElementVariables> elemVars;
+        elemVars.reserve(stageParams_->size());
+
+        for (unsigned int i = 0; i < stageParams_->size()-1; ++i)
+            elemVars.emplace_back(prevStageVariables_[i]);
+        elemVars.emplace_back(gridVariables);
 
         assemble_([&](const Element& element)
         {
-            auto localAssembler = localView(*this);
-            localAssembler.bind(element, gridVariables);
+            feGeometry.bind(element);
+            for (auto& vars : elemVars)
+                vars.bind(element, feGeometry);
+
+            LocalAssembler localAssembler(element, feGeometry, elemVars, *stageParams_);
             localAssembler.assembleResidual(r);
         });
     }
 
-    //! TODO: This is not so nice! But, it allows the newton to be completely agnostic
-    //!       about how to update the variables after a new iterate has been computed
-    //!       Until now, this was the updateGridVariables() interface in FVAssembler
-    //!       Is there a nicer way to generalize the update such that the newton can
-    //!       stay agnostic about it but we don't need to have it in the assembler!?
-    //!       One thing to consider is that for time-dependent problems, the grid variables
-    //!       are possibly time-dependent and need more than just the current solution.
-    //!       The InstationaryAssembler would probably carry the time information and could
-    //!       do the update... But still, maybe there is a better place...
-    //!
-    //! \brief Update a grid variables instance to the given solution
-    void update(GridVariables& gridVariables, const SolutionVector& x)
-    {
-        gridVariables.update(x, gridVariables.timeLevel());
-    }
-
     //! TODO: Do we want to remove this interface?
     //!       Should it be the assembler's job to compute the norm?
-    //! compute the residual and return it's vector norm
-    Scalar residualNorm(const GridVariables& gridVars) const
-    {
-        ResidualVector residual(numDofs());
-        assembleResidual(residual, gridVars);
-
-        // for box communicate the residual with the neighboring processes
-        // TODO: INSTEAD OF ISBOX, DETERMINE GENERALLY IF THE SCHEME NEEDS THIS AND UNCOMMENT
-        // if (isBox && gridView().comm().size() > 1)
-        // {
-        //     using VertexMapper = typename GridGeometry::VertexMapper;
-        //     VectorCommDataHandleSum<VertexMapper, SolutionVector, GridGeometry::GridView::dimension>
-        //         sumResidualHandle(gridGeometry_->vertexMapper(), residual);
-        //     gridView().communicate(sumResidualHandle,
-        //                            Dune::InteriorBorder_InteriorBorder_Interface,
-        //                            Dune::ForwardCommunication);
-        // }
-
-        // calculate the square norm of the residual
-        Scalar result2 = residual.two_norm2();
-        if (gridView().comm().size() > 1)
-            result2 = gridView().comm().sum(result2);
-
-        using std::sqrt;
-        return sqrt(result2);
-    }
+    Scalar residualNorm(const SolutionVector& x) const
+    { DUNE_THROW(Dune::NotImplemented, "ResidualNorm"); }
 
     /*!
      * \brief Tells the assembler which jacobian and residual to use.
@@ -325,49 +297,29 @@ public:
     ResidualVector& residual()
     { return *residual_; }
 
-
-
-    ///////////////////////////////////////////
-    // INTERFACES ADDED COMPARED TO StationaryAssembler
-    //////
-
     // prepare a stage within time integration step
-    void prepareStage(SolutionVector& x,
-                      GridVariables& gridVars,
+    void prepareStage(GridVariables& gridVars,
                       std::shared_ptr<const StageParams> params)
     {
         stageParams_ = params;
         const auto curStage = params->size() - 1;
 
-        // clean up if a new time step is started
-        if (curStage == 0)
-            stageVariables_.clear();
+        prevStageVariables_.push_back(gridVars);
 
         // make sure the variables live on the correct time level
-        // (the solution in the vars should be the right one already, but so far
-        // we have no possibility to just update the time)
         const auto t = params->timeAtStage(curStage);
         const auto prevT = params->timeAtStage(0);
         const auto dtFraction = params->timeStepFraction(curStage);
         TimeLevel<Scalar> timeLevel(t, prevT, dtFraction);
 
-        gridVars.update(x, timeLevel);
+        gridVars.updateTime(timeLevel);
     }
 
-    // register the state of a finished stage
-    void registerStage(SolutionVector& x,
-                       Variables& vars)
+    // TODO: IMPLEMENT
+    void clearStages()
     {
-        stageVariables_.emplace_back(vars);
+        prevStageVariables_.clear();
     }
-
-    const std::vector<GridVariables>& previousStageVariables() const
-    { return stageVariables_; }
-
-    //! TODO: Return reference!? But, the interfaces in the chain require shared_ptr...
-    std::shared_ptr<const StageParams> stageParams() const
-    { return stageParams_; }
-
 
 protected:
     // reset the residual vector to 0.0
@@ -438,11 +390,117 @@ protected:
             DUNE_THROW(NumericalProblem, "A process did not succeed in linearizing the system");
     }
 
+    void enforceDirichletConstraints_(const GridVariables& gridVars, JacobianMatrix& jac, SolutionVector& res)
+    {
+        // TODO: This is the FEM implementation. We should outsource this into
+        // discretization-specific helper classes
+        const auto& basis = gridGeometry().feBasis();
+        const auto& curSol = gridVars.dofs();
+
+        // container to store which DOFs are Dirichlet and values
+        using PrimaryVariables = typename ProblemTraits<Problem>::PrimaryVariables;
+        static constexpr auto numEq = PrimaryVariables::size();
+
+        std::vector< std::bitset<numEq> > isDirichlet(gridGeometry().numDofs());
+        SolutionVector values; values.resize(gridGeometry().numDofs());
+
+        // container to store local coordinates of an element
+        using LocalCoordinate = typename Element::Geometry::LocalCoordinate;
+        std::vector<LocalCoordinate> localDofCoords;
+        std::size_t curElementIndex = 0;
+        bool firstCall = true;
+
+        auto getDirichletValues = [&] (auto localIndex,
+                                       const auto& localView,
+                                       const auto& intersection)
+        {
+            const auto& element = localView.element();
+            const auto& problem = gridVars.problem();
+            const auto& timeLevel = gridVars.timeLevel();
+
+            const auto bcTypes = problem.boundaryTypes(element, intersection, timeLevel);
+            if (bcTypes.hasDirichlet())
+            {
+                // get the local coordinates of the dofs of the element
+                const auto eIdx = gridGeometry().elementMapper().index(element);
+                if (eIdx != curElementIndex || firstCall)
+                {
+                    std::vector<double> coords;
+                    const auto& interp = localView.tree().finiteElement().localInterpolation();
+                    interp.interpolate([&] (const LocalCoordinate& x) { return x[0]; }, coords);
+
+                    localDofCoords.resize(coords.size());
+                    for (unsigned int i = 0; i < coords.size(); ++i)
+                        localDofCoords[i][0] = coords[i];
+
+                    interp.interpolate([&] (const LocalCoordinate& x) { return x[1]; }, coords);
+                    for (unsigned int i = 0; i < coords.size(); ++i)
+                        localDofCoords[i][1] = coords[i];
+
+                    firstCall = false;
+                }
+
+                curElementIndex = eIdx;
+                const auto index = localView.index(localIndex);
+                for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
+                    if (bcTypes.isDirichlet(eqIdx))
+                        isDirichlet[index][eqIdx] = true;
+                values[index] = problem.dirichlet(element, localDofCoords[localIndex], timeLevel);
+            }
+        };
+
+        Dune::Functions::forEachBoundaryDOF(basis, getDirichletValues);
+
+        // modify matrix accordingly
+        for (auto rIt = jac.begin(); rIt != jac.end(); ++rIt)
+        {
+            const auto index = rIt.index();
+            if (isDirichlet[index].any())
+            {
+                for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
+                    if (isDirichlet[index][eqIdx])
+                        res[index][eqIdx] = curSol[index][eqIdx] - values[index][eqIdx];
+
+                for (auto cIt = rIt->begin(); cIt != rIt->end(); ++cIt)
+                {
+                    for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
+                    {
+                        if (isDirichlet[index][eqIdx])
+                        {
+                            (*cIt)[eqIdx] = 0.0;
+                            if (index == cIt.index())
+                                (*cIt)[eqIdx][eqIdx] = 1.0;
+                        }
+                    }
+                }
+            }
+            // SET 0 in off-diagonals?
+            // else
+            // {
+            //     for (auto cIt = rIt->begin(); cIt != rIt->end(); ++cIt)
+            //     {
+            //         for (unsigned int eqIdx = 0; eqIdx < numEq; ++eqIdx)
+            //         {
+            //             if (isDirichlet[cIt.index()][eqIdx])
+            //             {
+            //                 (*cIt)[eqIdx] = 0.0;
+            //                 // if (index == cIt.index())
+            //                 //     (*cIt)[eqIdx][eqIdx] = 1.0;
+            //             }
+            //         }
+            //     }
+            // }
+        }
+    }
+
+    void enforceInternalConstraints_(JacobianMatrix& jac, SolutionVector& res)
+    { /*TODO: Implement*/ }
+
     void enforcePeriodicConstraints_(JacobianMatrix& jac, SolutionVector& res)
     { /*TODO: Implement*/ }
 
 private:
-    //! the grid geometry on which it is assembled
+    //! TODO DOc this
     std::shared_ptr<const GridGeometry> gridGeometry_;
 
     //! shared pointers to the jacobian matrix and residual
@@ -452,8 +510,8 @@ private:
     //! parameters containing information on the current stage of time integration
     std::shared_ptr<const StageParams> stageParams_;
 
-    //! grid variables for the current stage
-    std::vector<GridVariables> stageVariables_;
+    //! TODO: Doc this
+    std::vector<GridVariables> prevStageVariables_;
 };
 
 } // namespace Dumux
