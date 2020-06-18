@@ -27,7 +27,7 @@
 
 #include <vector>
 
-#include <dune/geometry/referenceelements.hh>
+#include <dune/functions/functionspacebases/boundarydofs.hh>
 
 #include <dumux/common/indextraits.hh>
 #include <dumux/common/defaultmappertraits.hh>
@@ -69,7 +69,6 @@ class FEGridGeometry
     using GV = typename FEB::GridView;
     using GridIndexType = typename IndexTraits<GV>::GridIndex;
     using LocalIndexType = typename IndexTraits<GV>::LocalIndex;
-    using ReferenceElements = Dune::ReferenceElements<typename GV::ctype, GV::dimension>;
 
 public:
     //! export discretization method
