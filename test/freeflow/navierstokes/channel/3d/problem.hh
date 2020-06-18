@@ -62,13 +62,12 @@ struct FluidSystem<TypeTag, TTag::ThreeDChannelTest>
 };
 
 // Set the grid type
-#if DIM_3D
 template<class TypeTag>
-struct Grid<TypeTag, TTag::ThreeDChannelTest> { using type = Dune::YaspGrid<3>; };
-#else
-template<class TypeTag>
-struct Grid<TypeTag, TTag::ThreeDChannelTest> { using type = Dune::YaspGrid<2>; };
-#endif
+struct Grid<TypeTag, TTag::ThreeDChannelTest>
+{
+    using HostGrid = Dune::YaspGrid<3, Dune::EquidistantOffsetCoordinates<GetPropType<TypeTag, Properties::Scalar>, 3> >;
+    using type = Dune::SubGrid<HostGrid::dimension, HostGrid>;
+};
 
 // Set the problem property
 template<class TypeTag>
