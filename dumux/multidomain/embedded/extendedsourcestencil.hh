@@ -173,12 +173,12 @@ private:
     {
         if constexpr (subDomainIdx<id> == bulkIdx)
         {
-            const auto bulkElementIdx = couplingManager.problem(bulkIdx).gridGeometry().elementMapper().index(bulkElement);
+            const auto bulkElementIdx = couplingManager.problem(bulkDomain).gridGeometry().elementMapper().index(bulkElement);
             if (sourceStencils_.count(bulkElementIdx))
                 return sourceStencils_.at(bulkElementIdx);
         }
 
-        return couplingManager.emptyStencil(subDomainIdx<id>);
+        return couplingManager.emptyStencil(bulkDomain);
     }
 
     //! the additional stencil for the kernel evaluations / circle averages
