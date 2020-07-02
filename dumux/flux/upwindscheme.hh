@@ -187,6 +187,11 @@ template<class GridGeometry>
 class UpwindSchemeImpl<GridGeometry, DiscretizationMethod::ccmpfa>
 : public UpwindSchemeImpl<GridGeometry, DiscretizationMethod::cctpfa> {};
 
+//! Upwind scheme for cell-centered wmpfa schemes
+template<class GridGeometry>
+class UpwindSchemeImpl<GridGeometry, DiscretizationMethod::ccwmpfa>
+: public UpwindSchemeImpl<GridGeometry, DiscretizationMethod::cctpfa> {};
+
 } // end namespace Dumux
 
 #endif
