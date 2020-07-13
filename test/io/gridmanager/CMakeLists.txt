@@ -299,3 +299,71 @@ dumux_add_test(NAME test_gridmanager_mmesh
               LABELS unit io
               CMAKE_GUARD "( dune-mmesh_FOUND )"
               )
+
+add_executable(test_pnmgridcreator EXCLUDE_FROM_ALL test_pnmgridcreator.cc)
+
+dune_add_test(NAME test_pnmgridcreator_constant_params
+              TARGET test_pnmgridcreator
+              COMMAND ${dumux_INCLUDE_DIRS}/bin/testing/runtest.py
+              CMD_ARGS       --script fuzzy
+                             --files ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-3d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-3dgrid-constant-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-3d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-3dgrid-constant-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-2d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-2dgrid-constant-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-2d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-2dgrid-constant-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-1d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-1dgrid-constant-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-1d-constant.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-1dgrid-constant-params.vtp
+                             --command "${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator test_pnmgridcreator-constant-params.input")
+
+dune_add_test(NAME test_pnmgridcreator_random_params
+              TARGET test_pnmgridcreator
+              COMMAND ${dumux_INCLUDE_DIRS}/bin/testing/runtest.py
+              CMD_ARGS       --script fuzzy
+                             --files ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-3d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-3dgrid-random-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-3d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-3dgrid-random-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-2d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-2dgrid-random-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-2d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-2dgrid-random-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-1d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/generic-1dgrid-random-params.vtp
+                                     ${CMAKE_SOURCE_DIR}/test/references/pnmgridcreator-1d-random.vtp
+                                     ${CMAKE_CURRENT_BINARY_DIR}/dgf-1dgrid-random-params.vtp
+                             --command "${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator test_pnmgridcreator-random-params.input")
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_none
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input)
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_0
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input -Grid.RemoveThroatsOnBoundary 0)
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_1
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input -Grid.RemoveThroatsOnBoundary 1)
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_2
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input -Grid.RemoveThroatsOnBoundary 2)
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_3
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input -Grid.RemoveThroatsOnBoundary 3)
+
+dune_add_test(NAME test_pnmgridcreator_remove_throats_on_boundary_all
+              TARGET test_pnmgridcreator
+              COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_pnmgridcreator
+              CMD_ARGS test_remove-troats-on-boundary.input -Grid.RemoveThroatsOnBoundary "0 1 2 3")
